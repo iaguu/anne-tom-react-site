@@ -4,7 +4,10 @@ import { Link } from "react-router-dom";
 
 /* ===========================================================================
    HOME PAGE — ANNE & TOM
-   Versão com CTAs mais fortes, paleta mais quente e novas seções.
+   Versão mais interativa, com:
+   - Seção de Pizzas Veggie
+   - Seção de Mais Vendidas
+   - Ícones e textos um pouco maiores
    =========================================================================== */
 
 const HomeAnneTom = () => {
@@ -25,7 +28,7 @@ const HomeAnneTom = () => {
         <main className="pt-20">
           <Hero imageLoaded={imageLoaded} setImageLoaded={setImageLoaded} />
 
-          {/* DESTAQUES */}
+          {/* DESTAQUES GERAIS */}
           <SectionWrapper
             id="destaques"
             bg="bg-white"
@@ -56,8 +59,11 @@ const HomeAnneTom = () => {
             </div>
           </SectionWrapper>
 
-          {/* MAIS PEDIDOS DA CASA */}
+          {/* MAIS VENDIDAS */}
           <BestSellers />
+
+          {/* PIZZAS VEGGIE / LEVES */}
+          <VeggieSection />
 
           {/* COMO FUNCIONA */}
           <HowItWorks />
@@ -109,6 +115,7 @@ const HomeAnneTom = () => {
    =========================================================================== */
 
 /* HEADER -------------------------------------------------------------- */
+/* HEADER -------------------------------------------------------------- */
 const Header = ({ scrolled }) => (
   <header
     className={
@@ -121,11 +128,11 @@ const Header = ({ scrolled }) => (
     <div className="max-w-6xl mx-auto px-4 lg:px-6 h-16 flex items-center justify-between">
       {/* Logo + Local */}
       <Link to="/" className="flex items-center gap-3">
-        <div className="w-9 h-9 rounded-full bg-slate-900 flex items-center justify-center text-xs font-black text-white">
+        <div className="w-9 h-9 rounded-full bg-slate-900 flex items-center justify-center text-[11px] font-black text-white">
           A&T
         </div>
         <div className="leading-tight">
-          <p className="text-sm font-semibold tracking-tight">
+          <p className="text-[13px] font-semibold tracking-tight">
             Pizzaria Anne &amp; Tom
           </p>
           <p className="text-[11px] text-slate-500 -mt-0.5">
@@ -134,13 +141,16 @@ const Header = ({ scrolled }) => (
         </div>
       </Link>
 
-      {/* Menu Desktop */}
-      <nav className="hidden md:flex items-center gap-6 text-xs font-medium text-slate-600">
+      {/* Menu Desktop – menor */}
+      <nav className="hidden md:flex items-center gap-5 text-[12px] font-medium text-slate-600">
         <a href="#destaques" className="hover:text-slate-900 transition">
           Destaques
         </a>
         <a href="#mais-pedidas" className="hover:text-slate-900 transition">
-          Mais pedidos
+          Mais vendidas
+        </a>
+        <a href="#veggie" className="hover:text-slate-900 transition">
+          Pizzas veggie
         </a>
         <a href="#como-funciona" className="hover:text-slate-900 transition">
           Como funciona
@@ -153,42 +163,43 @@ const Header = ({ scrolled }) => (
         </Link>
       </nav>
 
-      {/* Botões */}
+      {/* Botões – levemente menores */}
       <div className="flex items-center gap-2">
         <Link
           to="/checkout"
           className="hidden sm:inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-slate-200 text-[11px] font-medium hover:bg-slate-50 transition"
         >
-          🧾 Ver resumo do pedido
+          🧾 Ver Carrinho
         </Link>
 
         <Link
           to="/cardapio"
-          className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-amber-500 to-rose-500 text-white text-xs font-semibold shadow-sm hover:brightness-110 transition"
+          className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-amber-500 to-rose-500 text-white text-[12px] font-semibold shadow-sm hover:brightness-110 transition"
         >
-          🍕 Montar meu pedido
+          🍕 Fazer Pedido
         </Link>
       </div>
     </div>
   </header>
 );
 
+
 /* HERO -------------------------------------------------------------- */
 const Hero = ({ imageLoaded, setImageLoaded }) => (
   <section className="bg-gradient-to-b from-amber-50 via-slate-50 to-slate-100">
     <div className="max-w-6xl mx-auto px-4 lg:px-6 py-12 lg:py-20 grid lg:grid-cols-2 gap-10 lg:gap-14 items-center">
       {/* TEXTO */}
-      <div className="space-y-4 lg:space-y-6 animate-fade-up">
-        <p className="uppercase text-[11px] tracking-[0.24em] text-amber-600">
+      <div className="space-y-5 lg:space-y-7 animate-fade-up">
+        <p className="uppercase text-[12px] tracking-[0.24em] text-amber-600">
           ZONA NORTE • SÃO PAULO
         </p>
 
-        <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black leading-tight text-slate-900">
+        <h1 className="text-4xl sm:text-5xl lg:text-[3.2rem] font-black leading-tight text-slate-900">
           Pizza artesanal com massa leve, muito recheio e clima de pizzaria de
           bairro.
         </h1>
 
-        <p className="text-sm sm:text-base text-slate-600 max-w-xl">
+        <p className="text-base sm:text-lg text-slate-600 max-w-xl">
           Forno bem quente, massa descansada por 48h e ingredientes frescos.
           Você monta o pedido pelo cardápio interno e recebe a pizza do jeitinho
           que combinou.
@@ -197,7 +208,7 @@ const Hero = ({ imageLoaded, setImageLoaded }) => (
         <div className="flex flex-wrap gap-3 pt-2">
           <Link
             to="/cardapio"
-            className="inline-flex items-center justify-center px-6 py-3 rounded-full bg-gradient-to-r from-amber-500 to-rose-500 text-white text-sm font-semibold shadow-sm hover:brightness-110 transition"
+            className="inline-flex items-center justify-center px-7 py-3.5 rounded-full bg-gradient-to-r from-amber-500 to-rose-500 text-white text-sm md:text-base font-semibold shadow-sm hover:brightness-110 transition"
           >
             Pedir agora 🍕
           </Link>
@@ -206,7 +217,7 @@ const Hero = ({ imageLoaded, setImageLoaded }) => (
             href="https://api.whatsapp.com/send?phone=5511932507007&text=Oi%20Anne%20%26%20Tom%2C%20quero%20fazer%20um%20pedido%20%F0%9F%8D%95"
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center justify-center px-5 py-3 rounded-full border border-emerald-200 bg-white text-sm text-emerald-700 hover:bg-emerald-50 transition"
+            className="inline-flex items-center justify-center px-6 py-3 rounded-full border border-emerald-200 bg-white text-sm md:text-base text-emerald-700 hover:bg-emerald-50 transition"
           >
             💬 Pedir pelo WhatsApp
           </a>
@@ -219,7 +230,7 @@ const Hero = ({ imageLoaded, setImageLoaded }) => (
             <AvatarBubble shade="400" />
             <AvatarBubble shade="500" />
           </div>
-          <p className="text-[11px] text-slate-500">
+          <p className="text-[12px] md:text-sm text-slate-500">
             Mais de{" "}
             <span className="font-semibold text-slate-800">
               1.500 pedidos entregues
@@ -247,7 +258,7 @@ const Hero = ({ imageLoaded, setImageLoaded }) => (
         </div>
 
         {/* BALÃO */}
-        <div className="hidden sm:block absolute -bottom-5 -left-4 bg-white/95 border border-slate-200 rounded-2xl px-4 py-3 shadow-md text-xs backdrop-blur">
+        <div className="hidden sm:block absolute -bottom-5 -left-4 bg-white/95 border border-slate-200 rounded-2xl px-4 py-3 shadow-md text-[12px] backdrop-blur">
           <p className="font-semibold text-slate-800">Massa descansada 48h</p>
           <p className="text-slate-500">Crocante por fora, macia por dentro.</p>
         </div>
@@ -256,32 +267,36 @@ const Hero = ({ imageLoaded, setImageLoaded }) => (
   </section>
 );
 
-/* MAIS PEDIDOS ------------------------------------------------------- */
+/* MAIS VENDIDAS ------------------------------------------------------ */
 const BestSellers = () => {
   const items = [
     {
       name: "Musa",
-      desc: "Queijo muçarela, tomate em rodelas, manjericão fresco e toque de azeite.",
+      desc: "Muçarela, tomate fresco, manjericão e toque de azeite.",
       badge: "Queridinha da casa",
       price: "a partir de R$ 60",
+      icon: "⭐",
     },
     {
       name: "Namorados",
-      desc: "Dois queijos, calabresa artesanal e cebola na medida certa.",
+      desc: "Dois queijos, calabresa artesanal e cebola na medida.",
       badge: "Perfeita pra dividir",
       price: "a partir de R$ 69",
+      icon: "❤️",
     },
     {
       name: "Três Corações",
-      desc: "Combinação de três queijos marcantes e borda bem recheada.",
+      desc: "Trio de queijos marcantes com borda bem recheada.",
       badge: "Para amantes de queijo",
       price: "a partir de R$ 76",
+      icon: "💛",
     },
     {
       name: "Amor Perfeito",
-      desc: "Sabor autoral com toque doce-salgado que surpreende no primeiro pedaço.",
+      desc: "Sabor autoral com toque doce-salgado que surpreende.",
       badge: "Sabor autoral",
       price: "a partir de R$ 72",
+      icon: "💘",
     },
   ];
 
@@ -292,7 +307,7 @@ const BestSellers = () => {
       border="border-y border-slate-100"
     >
       <SectionTitle
-        eyebrow="Mais pedidos da casa"
+        eyebrow="Mais vendidas"
         title="Sabores que saem toda noite"
         subtitle="Alguns dos sabores que mais aparecem nos pedidos do dia a dia."
       />
@@ -303,10 +318,10 @@ const BestSellers = () => {
         ))}
       </div>
 
-      <div className="flex justify-center pt-4">
+      <div className="flex justify-center pt-5">
         <Link
           to="/cardapio"
-          className="inline-flex items-center justify-center px-6 py-3 rounded-full bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 transition"
+          className="inline-flex items-center justify-center px-7 py-3 rounded-full bg-slate-900 text-white text-sm md:text-base font-semibold hover:bg-slate-800 transition"
         >
           Ver cardápio completo
         </Link>
@@ -316,19 +331,108 @@ const BestSellers = () => {
 };
 
 const BestSellerCard = ({ item }) => (
-  <div className="bg-white rounded-2xl border border-slate-100 shadow-sm px-4 py-5 flex flex-col gap-2 hover:shadow-md transition relative">
-    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-50 text-[10px] font-medium text-amber-700 mb-1">
-      {item.badge}
-    </span>
-    <p className="text-sm font-semibold text-slate-900">{item.name}</p>
-    <p className="text-xs text-slate-500 leading-relaxed flex-1">
+  <button
+    type="button"
+    className="bg-white rounded-2xl border border-slate-100 shadow-sm px-4 py-5 flex flex-col gap-2 hover:shadow-md hover:-translate-y-[2px] transition transform text-left"
+  >
+    <div className="flex items-center justify-between mb-1">
+      <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-amber-50 text-[11px] font-medium text-amber-700">
+        {item.badge}
+      </span>
+      <span className="text-2xl">{item.icon}</span>
+    </div>
+    <p className="text-sm md:text-base font-semibold text-slate-900">
+      {item.name}
+    </p>
+    <p className="text-xs md:text-sm text-slate-500 leading-relaxed flex-1">
       {item.desc}
     </p>
-    <p className="text-[11px] font-medium text-slate-700 mt-1">
+    <p className="text-[12px] font-medium text-slate-700 mt-1">
       {item.price}
     </p>
-  </div>
+    <span className="mt-2 text-[11px] text-amber-600 font-medium">
+      Ver detalhes no cardápio →
+    </span>
+  </button>
 );
+
+/* PIZZAS VEGGIE ------------------------------------------------------ */
+const VeggieSection = () => {
+  const items = [
+    {
+      name: "Veggie Anne",
+      icon: "🥬",
+      desc: "Muçarela, brócolis, tomate seco e toque de alho.",
+      tag: "Leve e bem temperada",
+    },
+    {
+      name: "Quatro Queijos",
+      icon: "🧀",
+      desc: "Muçarela, provolone, parmesão e catupiry.",
+      tag: "Clássico sem carne",
+    },
+    {
+      name: "Marguerita",
+      icon: "🍅",
+      desc: "Muçarela, tomate, manjericão fresco e azeite.",
+      tag: "Veggie favorita",
+    },
+  ];
+
+  return (
+    <SectionWrapper
+      id="veggie"
+      bg="bg-emerald-50/40"
+      border="border-y border-emerald-100"
+    >
+      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5 mb-6">
+        <SectionTitle
+          eyebrow="Pizzas veggie e sem carne"
+          title="Opções leves pra quem quer pegar mais leve"
+          subtitle="Sabores sem carne, com bastante queijo e legumes bem escolhidos."
+        />
+        <div className="text-xs md:text-sm text-emerald-800 bg-emerald-100/70 border border-emerald-200 rounded-2xl px-4 py-2 max-w-xs">
+          🥗{" "}
+          <span className="font-semibold">
+            Todas essas pizzas são preparadas sem carne,
+          </span>{" "}
+          ideais pra quem prefere algo mais leve ou vegetariano.
+        </div>
+      </div>
+
+      <div className="grid md:grid-cols-3 gap-4">
+        {items.map((item) => (
+          <div
+            key={item.name}
+            className="bg-white rounded-2xl border border-emerald-100 shadow-sm px-4 py-5 flex flex-col gap-2 hover:shadow-md hover:-translate-y-[2px] transition transform"
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-3xl">{item.icon}</span>
+              <p className="text-sm md:text-base font-semibold text-slate-900">
+                {item.name}
+              </p>
+            </div>
+            <p className="text-xs md:text-sm text-slate-600 leading-relaxed">
+              {item.desc}
+            </p>
+            <span className="mt-1 text-[11px] text-emerald-700 font-medium">
+              {item.tag}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex justify-center pt-5">
+        <Link
+          to="/cardapio"
+          className="inline-flex items-center justify-center px-6 py-3 rounded-full border border-emerald-300 bg-white text-sm md:text-base text-emerald-800 hover:bg-emerald-50 transition"
+        >
+          Ver apenas opções veggie no cardápio 🥬
+        </Link>
+      </div>
+    </SectionWrapper>
+  );
+};
 
 /* COMO FUNCIONA ------------------------------------------------------ */
 const HowItWorks = () => (
@@ -364,12 +468,16 @@ const HowItWorks = () => (
 );
 
 const StepCard = ({ index, title, text }) => (
-  <div className="bg-slate-50 rounded-2xl border border-slate-100 px-4 py-5 flex flex-col gap-2">
-    <span className="w-7 h-7 flex items-center justify-center rounded-full bg-amber-500 text-[11px] font-bold text-white">
+  <div className="bg-slate-50 rounded-2xl border border-slate-100 px-5 py-6 flex flex-col gap-2">
+    <span className="w-8 h-8 flex items-center justify-center rounded-full bg-amber-500 text-[12px] font-bold text-white">
       {index}
     </span>
-    <p className="text-sm font-semibold text-slate-800">{title}</p>
-    <p className="text-xs text-slate-500 leading-relaxed">{text}</p>
+    <p className="text-sm md:text-base font-semibold text-slate-800">
+      {title}
+    </p>
+    <p className="text-xs md:text-sm text-slate-500 leading-relaxed">
+      {text}
+    </p>
   </div>
 );
 
@@ -384,13 +492,13 @@ const PartyBlock = () => (
         <h2 className="text-2xl lg:text-3xl font-black tracking-tight text-slate-900">
           Vai fazer encontro com a galera? Deixa a pizza por nossa conta.
         </h2>
-        <p className="text-sm text-slate-600 max-w-xl">
+        <p className="text-sm md:text-base text-slate-600 max-w-xl">
           Monte um pedido com vários sabores, combos e bebidas. A gente te ajuda
           a calcular quantas pizzas precisa, monta o resumo e combina tudo pelo
           WhatsApp.
         </p>
 
-        <ul className="text-xs text-slate-600 space-y-1 pt-1">
+        <ul className="text-xs md:text-sm text-slate-600 space-y-1 pt-1">
           <li>• Sugestão de quantidade por número de pessoas</li>
           <li>• Opções mais em conta para grupos grandes</li>
           <li>• Horário combinado pra chegar na hora certa</li>
@@ -401,13 +509,13 @@ const PartyBlock = () => (
             href="https://api.whatsapp.com/send?phone=5511932507007&text=Oi%20Anne%20%26%20Tom%2C%20quero%20montar%20um%20pedido%20para%20confraterniza%C3%A7%C3%A3o%20%F0%9F%8E%89"
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center justify-center px-6 py-3 rounded-full bg-emerald-500 text-white text-sm font-semibold shadow-sm hover:bg-emerald-600 transition"
+            className="inline-flex items-center justify-center px-6 py-3 rounded-full bg-emerald-500 text-white text-sm md:text-base font-semibold shadow-sm hover:bg-emerald-600 transition"
           >
             Falar sobre pedido grande 🎉
           </a>
           <Link
             to="/cardapio"
-            className="inline-flex items-center justify-center px-5 py-3 rounded-full border border-slate-200 bg-white text-sm text-slate-800 hover:bg-slate-50 transition"
+            className="inline-flex items-center justify-center px-5 py-3 rounded-full border border-slate-200 bg-white text-sm md:text-base text-slate-800 hover:bg-slate-50 transition"
           >
             Ver opções de sabores
           </Link>
@@ -415,8 +523,8 @@ const PartyBlock = () => (
       </div>
 
       <div className="hidden lg:flex justify-end">
-        <div className="w-full max-w-xs rounded-3xl bg-white/80 border border-slate-100 shadow-sm p-4 space-y-2 text-xs text-slate-600 backdrop-blur">
-          <p className="text-[11px] font-semibold text-slate-800">
+        <div className="w-full max-w-xs rounded-3xl bg-white/80 border border-slate-100 shadow-sm p-4 space-y-2 text-xs md:text-sm text-slate-600 backdrop-blur">
+          <p className="text-[12px] font-semibold text-slate-800">
             Exemplo de pedido para 12 pessoas:
           </p>
           <ul className="space-y-1">
@@ -436,7 +544,7 @@ const PartyBlock = () => (
 /* COMPONENTES PEQUENOS ---------------------------------------------- */
 const AvatarBubble = ({ shade = "300" }) => (
   <div
-    className={`w-7 h-7 rounded-full bg-slate-${shade} border border-white`}
+    className={`w-8 h-8 rounded-full bg-slate-${shade} border border-white`}
   />
 );
 
@@ -449,32 +557,40 @@ const SectionWrapper = ({ children, id, bg, border }) => (
 );
 
 const SectionTitle = ({ eyebrow, title, subtitle }) => (
-  <div className="text-center space-y-2 max-w-2xl mx-auto">
+  <div className="text-center space-y-3 max-w-3xl mx-auto">
     {eyebrow && (
-      <p className="uppercase text-[10px] tracking-[0.2em] text-amber-600">
+      <p className="uppercase text-[11px] tracking-[0.2em] text-amber-600">
         {eyebrow}
       </p>
     )}
-    <h2 className="text-2xl font-bold tracking-tight text-slate-900">
+    <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900">
       {title}
     </h2>
-    <p className="text-xs sm:text-sm text-slate-500">{subtitle}</p>
+    <p className="text-sm md:text-base text-slate-500">{subtitle}</p>
   </div>
 );
 
 const FeatureCard = ({ icon, title, text }) => (
-  <div className="bg-white rounded-2xl border border-slate-100 shadow-sm px-4 py-5 flex flex-col gap-2 hover:shadow-md transition">
-    <div className="text-2xl">{icon}</div>
-    <p className="text-sm font-semibold text-slate-800">{title}</p>
-    <p className="text-xs text-slate-500 leading-relaxed">{text}</p>
+  <div className="bg-white rounded-2xl border border-slate-100 shadow-sm px-5 py-6 flex flex-col gap-2 hover:shadow-md hover:-translate-y-[1px] transition transform">
+    <div className="text-3xl md:text-4xl">{icon}</div>
+    <p className="text-sm md:text-base font-semibold text-slate-800">
+      {title}
+    </p>
+    <p className="text-xs md:text-sm text-slate-500 leading-relaxed">
+      {text}
+    </p>
   </div>
 );
 
 const Testimonial = ({ name, text }) => (
   <div className="bg-white rounded-2xl border border-slate-100 shadow-sm px-4 py-5 flex flex-col gap-2">
-    <p className="text-[11px] text-amber-500">★★★★★</p>
-    <p className="text-xs text-slate-500 leading-relaxed">“{text}”</p>
-    <p className="text-xs font-semibold text-slate-800 mt-1">{name}</p>
+    <p className="text-[12px] text-amber-500">★★★★★</p>
+    <p className="text-xs md:text-sm text-slate-500 leading-relaxed">
+      “{text}”
+    </p>
+    <p className="text-xs md:text-sm font-semibold text-slate-800 mt-1">
+      {name}
+    </p>
   </div>
 );
 
@@ -486,7 +602,7 @@ const FinalCTA = () => (
         Bora pedir uma Anne &amp; Tom hoje?
       </h2>
 
-      <p className="text-sm text-slate-200 max-w-2xl mx-auto">
+      <p className="text-sm md:text-base text-slate-200 max-w-2xl mx-auto">
         Monte seu pedido pelo cardápio interno, revise tudo no checkout e envie
         em segundos para o WhatsApp. Noite de pizza resolvida.
       </p>
@@ -494,14 +610,14 @@ const FinalCTA = () => (
       <div className="flex flex-wrap justify-center gap-3 pt-2">
         <Link
           to="/cardapio"
-          className="px-6 py-3 rounded-full bg-gradient-to-r from-amber-400 to-rose-500 text-sm font-semibold shadow-sm hover:brightness-110 transition"
+          className="px-6 md:px-7 py-3 rounded-full bg-gradient-to-r from-amber-400 to-rose-500 text-sm md:text-base font-semibold shadow-sm hover:brightness-110 transition"
         >
           Montar meu pedido 🍕
         </Link>
 
         <Link
           to="/checkout"
-          className="px-5 py-3 rounded-full border border-slate-500 bg-slate-800 text-sm text-slate-50 hover:bg-slate-700 transition"
+          className="px-5 md:px-6 py-3 rounded-full border border-slate-500 bg-slate-800 text-sm md:text-base text-slate-50 hover:bg-slate-700 transition"
         >
           Ver resumo do carrinho 🧾
         </Link>
