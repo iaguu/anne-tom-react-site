@@ -2,7 +2,7 @@
 // CARDÁPIO INTERNO • ANNE & TOM
 // Versão completa com:
 // - Badges de destaque
-// - Extras dinamicos da API
+// - Extras dinâmicos da API
 // - Sugestões para upsell
 // - Meio a meio
 // - Busca, categorias
@@ -48,72 +48,166 @@ function isPizzariaOpen(now = new Date()) {
   return minutes >= rule.open && minutes < rule.close;
 }
 
-// Normaliza o JSON vindo da API
+// Abas por destaque / promoções / categorias especiais
+const BADGE_TABS = [
+  { key: "all", label: "Todos" },
+  { key: "best", label: "Mais pedidos" },
+  { key: "new", label: "Novidades" },
+  { key: "veggie", label: "Veggie" },
+  { key: "hot", label: "Picantes" },
+  { key: "esfiha", label: "Big Esfihas" },
+  { key: "promo", label: "Combos & Promoções" },
+  { key: "doces", label: "Pizzas doces" },
+];
+
+// Label bonitinho para categoria
+const prettyCategory = (c) => {
+  if (!c) return "";
+  if (c === "todas") return "Todas";
+  const lower = String(c).toLowerCase();
+  return lower.charAt(0).toUpperCase() + lower.slice(1);
+};
+
+// Converte badges "humanos" do JSON em códigos usados nas abas
+// e também tenta inferir por nome/categoria/ingredientes
+const normalizeBadgesFromItem = (item) => {
+  const rawBadges = Array.isArray(item.badges) ? item.badges : [];
+  const name = item.name || item.nome || "";
+  const category = item.category || item.categoria || "";
+  const ingredientes = Array.isArray(item.ingredientes)
+    ? item.ingredientes
+    : [];
+
+  const text = `${name} ${category} ${ingredientes.join(" ")}`.toLowerCase();
+
+  const badgesSet = new Set();
+
+  // --- mapeia badges que vierem escritos ---
+  rawBadges.forEach((b) => {
+    const v = String(b || "").toLowerCase();
+
+    if (v.includes("veggie") || v.includes("veg")) {
+      badgesSet.add("veggie");
+    } else if (
+      v.includes("picante") ||
+      v.includes("pimenta") ||
+      v.includes("hot") ||
+      v.includes("spicy")
+    ) {
+      badgesSet.add("hot");
+    } else if (v.includes("mais pedido") || v.includes("best")) {
+      badgesSet.add("best");
+    } else if (
+      v.includes("promo") ||
+      v.includes("combo") ||
+      v.includes("oferta")
+    ) {
+      badgesSet.add("promo");
+    } else if (v.includes("novo") || v.includes("lançamento")) {
+      badgesSet.add("new");
+    }
+  });
+
+  // --- heurísticas extras, caso o JSON não traga badge explícito ---
+
+  // Picante: se tiver pimenta no texto
+  if (text.includes("pimenta") || text.includes("apiment")) {
+    badgesSet.add("hot");
+  }
+
+  // Veggie: se não achar carne mas achar queijos/legumes
+  const hasMeat =
+    /calabresa|bacon|frango|carne|presunto|lombo|lingui[çc]a|peru|pepperoni|mignon|costela|salma[oã]|camar[aã]o|atum|anchov|peixe|pernil/i.test(
+      text
+    );
+
+  const hasVeggieHint =
+    /mussarela|muçarela|mozarela|queijo|ricota|gorgonzola|parmes[aã]o|catupiry|br[oó]colis|milho|palmito|escaraola|r[uú]cula|tomate|berinjela|abobrinha|cebola|piment[aã]o|champignon|azeitona|alcaparra|alho/i.test(
+      text
+    );
+
+  if (!hasMeat && hasVeggieHint) {
+    badgesSet.add("veggie");
+  }
+
+  // Mais pedido: sabores clássicos
+  const normName = (name || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
+  if (
+    /musa|calabresa|portuguesa|frango com catupiry|anne & tom|anne e tom|mucuripe|4 queijos|quatro queijos|marguerita|margherita/.test(
+      normName
+    )
+  ) {
+    badgesSet.add("best");
+  }
+
+  return Array.from(badgesSet);
+};
+
+// Normaliza o JSON vindo da API (compatível com menu.txt)
 function normalizePizzasFromJson(json) {
   let items = [];
 
-  if (!json) {
-    items = [];
-  } else if (Array.isArray(json)) {
-    items = json;
-  } else if (Array.isArray(json.products)) {
-    items = json.products;
-  } else if (Array.isArray(json.items)) {
-    items = json.items;
-  } else {
-    items = [];
-  }
+  if (!json) items = [];
+  else if (Array.isArray(json)) items = json;
+  else if (Array.isArray(json.products)) items = json.products;
+  else if (Array.isArray(json.items)) items = json.items;
+  else items = [];
 
-  const PIZZA_CATEGORIES = [
-    "queijo",
-    "carne",
-    "legumes",
-    "peixes",
-    "vegana",
-    "doces",
-  ];
+  const safeNumber = (v) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
 
   return items
     .filter((item) => {
-      if (PIZZA_CATEGORIES.includes(item.categoria)) return true;
-      if (item.type === "pizza") return true;
-      return false;
+      // ❌ Não exibir pausados/inativos
+      if (item.active === false) return false;
+      if (item.isAvailable === false) return false;
+
+      // Só pizzas no cardápio principal
+      return item.type === "pizza";
     })
     .map((item) => {
-      const id = String(item.id ?? item.codigo ?? item.code ?? "");
-      const nome = item.nome || item.name || "";
-      const categoria = item.categoria || "pizza";
-      const badges = Array.isArray(item.badges) ? item.badges : [];
-      const extras = Array.isArray(item.extras) ? item.extras : [];
-      const sugestoes = Array.isArray(item.sugestoes)
-        ? item.sugestoes
-        : [];
+      const categoria = item.category || item.categoria || "Outros";
+      const categoriaUpper = String(categoria).toUpperCase();
 
-      let ingredientes = [];
-      if (Array.isArray(item.ingredientes)) {
-        ingredientes = item.ingredientes;
-      } else if (item.description) {
-        ingredientes = item.description
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean);
+      let precoBroto = safeNumber(
+        item.priceBroto ?? item.preco_broto
+      );
+      let precoGrande = safeNumber(
+        item.priceGrande ?? item.preco_grande
+      );
+
+      // 🔥 Regra: BIG ESFIHAS não exibem "broto"
+      // (tratamos como tamanho único = "Grande")
+      if (categoriaUpper.includes("ESFIHA")) {
+        const unitPrice =
+          precoGrande != null ? precoGrande : precoBroto;
+        precoBroto = null;
+        precoGrande = unitPrice;
       }
 
-      const preco_broto =
-        item.preco_broto != null ? Number(item.preco_broto) : null;
-      const preco_grande =
-        item.preco_grande != null ? Number(item.preco_grande) : null;
+      // Normaliza badges para os códigos usados nas abas
+      const badges = normalizeBadgesFromItem(item);
 
       return {
-        id,
-        nome,
+        id: String(item.id),
+        nome: item.name || item.nome || "",
         categoria,
-        ingredientes,
-        preco_broto,
-        preco_grande,
+        ingredientes: Array.isArray(item.ingredientes)
+          ? item.ingredientes
+          : [],
+        preco_broto: precoBroto,
+        preco_grande: precoGrande,
         badges,
-        extras,
-        sugestoes,
+        extras: Array.isArray(item.extras) ? item.extras : [],
+        sugestoes: Array.isArray(item.sugestoes)
+          ? item.sugestoes
+          : [],
       };
     });
 }
@@ -125,6 +219,7 @@ const CardapioPage = () => {
   // ---- Estados Gerais ----
   const [search, setSearch] = useState("");
   const [categoria, setCategoria] = useState("todas");
+  const [badgeFilter, setBadgeFilter] = useState("all");
   const [menuData, setMenuData] = useState(null);
 
   const [loadingMenu, setLoadingMenu] = useState(false);
@@ -189,7 +284,10 @@ const CardapioPage = () => {
             JSON.stringify(payload)
           );
         } catch (storageErr) {
-          console.warn("[Cardapio] Não foi possível salvar cache local:", storageErr);
+          console.warn(
+            "[Cardapio] Não foi possível salvar cache local:",
+            storageErr
+          );
         }
       } catch (err) {
         console.error("[Cardapio] Erro ao buscar API de menu:", err);
@@ -210,7 +308,10 @@ const CardapioPage = () => {
             setMenuError("Erro ao carregar cardápio. Tente novamente.");
           }
         } catch (cacheErr) {
-          console.error("[Cardapio] Erro ao ler cache local:", cacheErr);
+          console.error(
+            "[Cardapio] Erro ao ler cache local:",
+            cacheErr
+          );
           setMenuError("Erro ao carregar cardápio. Tente novamente.");
         }
       } finally {
@@ -225,7 +326,10 @@ const CardapioPage = () => {
   }, []);
 
   // Normaliza
-  const pizzas = useMemo(() => normalizePizzasFromJson(menuData), [menuData]);
+  const pizzas = useMemo(
+    () => normalizePizzasFromJson(menuData),
+    [menuData]
+  );
 
   // Categorias dinamicas
   const categorias = useMemo(() => {
@@ -233,20 +337,40 @@ const CardapioPage = () => {
     return ["todas", ...Array.from(set)];
   }, [pizzas]);
 
-  // Filtro
+  // Filtro principal (categoria + busca + aba de badges)
   const pizzasFiltradas = useMemo(() => {
     const termo = search.toLowerCase();
+
     return pizzas.filter((p) => {
-      const okCat = categoria === "todas" || p.categoria === categoria;
+      const categoriaUpper = String(p.categoria || "").toUpperCase();
 
-      const texto = [p.nome, p.categoria, ...(p.ingredientes || [])]
-        .join(" ")
-        .toLowerCase();
+      const okCat =
+        categoria === "todas" || p.categoria === categoria;
 
+      const texto = `${p.nome} ${p.categoria} ${(p.ingredientes || []).join(
+        " "
+      )}`.toLowerCase();
       const okBusca = texto.includes(termo);
-      return okCat && okBusca;
+
+      const badges = p.badges || [];
+
+      let okBadge = true;
+      if (badgeFilter === "all") {
+        okBadge = true;
+      } else if (badgeFilter === "promo") {
+        okBadge = /PROMO|COMBO|OFERTA/.test(categoriaUpper);
+      } else if (badgeFilter === "esfiha") {
+        okBadge = categoriaUpper.includes("ESFIHA");
+      } else if (badgeFilter === "doces") {
+        okBadge = categoriaUpper.includes("DOCE");
+      } else {
+        // best, new, veggie, hot → via badges
+        okBadge = badges.includes(badgeFilter);
+      }
+
+      return okCat && okBusca && okBadge;
     });
-  }, [pizzas, categoria, search]);
+  }, [pizzas, categoria, search, badgeFilter]);
 
   // Pizza do meio
   const meioPizza = useMemo(() => {
@@ -274,7 +398,7 @@ const CardapioPage = () => {
   const extrasDaPizza = selectedPizza?.extras || [];
   const extrasTotais = extrasDaPizza
     .filter((e) => extrasSelecionados.includes(e.id))
-    .reduce((acc, e) => acc + e.preco, 0);
+    .reduce((acc, e) => acc + (Number(e.preco) || 0), 0);
 
   // Total
   const precoTotal = (precoUnitario + extrasTotais) * quantidade;
@@ -392,7 +516,7 @@ const CardapioPage = () => {
             >
               {categorias.map((c) => (
                 <option key={c} value={c}>
-                  {c === "todas" ? "Todas" : c}
+                  {prettyCategory(c)}
                 </option>
               ))}
             </select>
@@ -412,6 +536,23 @@ const CardapioPage = () => {
             Sabores disponíveis
           </h2>
 
+          {/* ABAS DE DESTAQUE */}
+          <div className="flex flex-wrap gap-2 mb-2">
+            {BADGE_TABS.map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setBadgeFilter(tab.key)}
+                className={`px-3 py-1.5 rounded-full text-xs md:text-sm border transition-colors ${
+                  badgeFilter === tab.key
+                    ? "bg-slate-900 text-white border-slate-900"
+                    : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
           <div className="grid md:grid-cols-2 gap-5">
             {pizzasFiltradas.map((pizza) => (
               <button
@@ -428,7 +569,7 @@ const CardapioPage = () => {
                 <div className="flex-1 flex flex-col justify-between">
                   <div>
                     <p className="text-xs uppercase text-slate-400">
-                      {pizza.categoria}
+                      {prettyCategory(pizza.categoria)}
                     </p>
 
                     <h3 className="text-base md:text-lg font-semibold">
@@ -460,6 +601,11 @@ const CardapioPage = () => {
                       {pizza.badges?.includes("veggie") && (
                         <span className="px-2 py-0.5 text-[11px] bg-emerald-100 text-emerald-700 rounded-full">
                           🥬 Veggie
+                        </span>
+                      )}
+                      {pizza.badges?.includes("promo") && (
+                        <span className="px-2 py-0.5 text-[11px] bg-purple-100 text-purple-700 rounded-full">
+                          💥 Promo
                         </span>
                       )}
                     </div>
@@ -535,7 +681,8 @@ const CardapioPage = () => {
                             : "bg-white border-slate-300"
                         }`}
                       >
-                        Broto · {formatCurrency(selectedPizza.preco_broto)}
+                        Broto ·{" "}
+                        {formatCurrency(selectedPizza.preco_broto)}
                       </button>
                     )}
 
@@ -620,7 +767,12 @@ const CardapioPage = () => {
                           />
                           <span>{ext.nome}</span>
                         </div>
-                        <span>+ {formatCurrency(ext.preco)}</span>
+                        <span>
+                          +{" "}
+                          {formatCurrency(
+                            ext.preco ?? ext.price ?? 0
+                          )}
+                        </span>
                       </label>
                     ))}
                   </div>
