@@ -1,10 +1,7 @@
 // src/hooks/useCheckout.js
 import { useRef, useEffect, useMemo, useState } from "react";
 import { useCart } from "../context/CartContext";
-
-/* ================= CONFIG: API DESKTOP ================== */
-
-const API_URL = "https://portalled-keshia-intolerable.ngrok-free.dev";
+import server from "../api/server";
 
 /* ================= CONFIG: TAXA POR BAIRRO ================== */
 
@@ -125,15 +122,7 @@ async function enviarParaDesktop(items, dados, totalFinal, pagamento) {
 
     console.log("📦 Enviando para desktop:", payload);
 
-    const res = await fetch(`${API_URL}/api/orders`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        "ngrok-skip-browser-warning": "true",
-      },
-      body: JSON.stringify(payload),
-    });
+    const res = await server.enviarParaDesktop(JSON.stringify(payload))
 
     if (!res.ok) {
       const txt = await res.text();
@@ -160,18 +149,7 @@ async function checkCustomerByPhone(phoneRaw) {
   }
 
   try {
-    const res = await fetch(
-      `${API_URL}/api/customers/by-phone?phone=${encodeURIComponent(
-        phoneDigits
-      )}`,
-      {
-        method: "GET",
-        headers: {
-          Accept: "application/json",
-          "ngrok-skip-browser-warning": "true",
-        },
-      }
-    );
+    const res = await server.checkCustomerByPhone(encodeURIComponent(phoneDigits))
 
     if (res.status === 404) {
       return { found: false, customer: null };
@@ -210,15 +188,7 @@ async function salvarCliente(dadosCliente) {
   };
 
   try {
-    const res = await fetch(`${API_URL}/api/customers`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        "ngrok-skip-browser-warning": "true",
-      },
-      body: JSON.stringify(payload),
-    });
+    const res = await server.salvarCliente(JSON.stringify(payload))
 
     if (!res.ok) {
       const txt = await res.text();

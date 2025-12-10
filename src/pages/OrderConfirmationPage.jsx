@@ -1,13 +1,10 @@
 // src/pages/OrderConfirmationPage.jsx
 import React, { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import server from "../api/server";
 
 const formatCurrencyBRL = (value) =>
   Number(value || 0).toFixed(2).replace(".", ",");
-
-const API_BASE_URL =
-  process.env.REACT_APP_AT_API_BASE_URL ||
-  "https://portalled-keshia-intolerable.ngrok-free.dev";
 
 // -----------------------------
 // Helpers de status / ETA
@@ -229,22 +226,7 @@ const OrderConfirmationPage = () => {
         setTrackingLoading(true);
         setTrackingError(null);
 
-        console.log(
-          "[OrderConfirmation] buscando status em tempo real para:",
-          trackingId
-        );
-        console.log("[OrderConfirmation] API_BASE_URL:", API_BASE_URL);
-
-        const resp = await fetch(
-          `${API_BASE_URL}/motoboy/pedido/${encodeURIComponent(trackingId)}`,
-          {
-            method: "GET",
-            headers: {
-              Accept: "application/json",
-              "ngrok-skip-browser-warning": "true",
-            },
-          }
-        );
+        const resp = await server.fetchStatus(encodeURIComponent(trackingId))
 
         if (!resp.ok) {
           throw new Error(`HTTP ${resp.status}`);
