@@ -6,7 +6,8 @@ const formatCurrencyBRL = (value) =>
   Number(value || 0).toFixed(2).replace(".", ",");
 
 const API_BASE_URL =
-  process.env.REACT_APP_AT_API_BASE_URL || "https://portalled-keshia-intolerable.ngrok-free.dev";
+  process.env.REACT_APP_AT_API_BASE_URL ||
+  "https://portalled-keshia-intolerable.ngrok-free.dev";
 
 // -----------------------------
 // Helpers de status / ETA
@@ -235,11 +236,28 @@ const OrderConfirmationPage = () => {
         console.log("[OrderConfirmation] API_BASE_URL:", API_BASE_URL);
 
         const resp = await fetch(
-          `${API_BASE_URL}/motoboy/pedido/${encodeURIComponent(trackingId)}`
+          `${API_BASE_URL}/motoboy/pedido/${encodeURIComponent(trackingId)}`,
+          {
+            method: "GET",
+            headers: {
+              Accept: "application/json",
+              "ngrok-skip-browser-warning": "true",
+            },
+          }
         );
 
         if (!resp.ok) {
           throw new Error(`HTTP ${resp.status}`);
+        }
+
+        const contentType = resp.headers.get("content-type") || "";
+        if (!contentType.includes("application/json")) {
+          const txt = await resp.text();
+          console.error(
+            "[OrderConfirmation] Resposta não JSON no tracking (provável HTML do Ngrok):",
+            txt.slice(0, 400)
+          );
+          throw new Error("Resposta não JSON da API de tracking.");
         }
 
         const data = await resp.json();
@@ -247,7 +265,7 @@ const OrderConfirmationPage = () => {
 
         console.log("[OrderConfirmation] resposta do tracking:", data);
 
-        // 🔴 AQUI o ajuste pro formato real:
+        // Ajuste pro formato real:
         // - se vier { items: [ {...} ] }, pega o primeiro
         // - se vier { order: {...} }, usa order
         let order = null;
@@ -504,8 +522,7 @@ const OrderConfirmationPage = () => {
                       <p className="text-slate-700 font-medium whitespace-nowrap">
                         R{"$ "}
                         {formatCurrencyBRL(
-                          (item.precoUnitario || 0) *
-                            (item.quantidade || 0)
+                          (item.precoUnitario || 0) * (item.quantidade || 0)
                         )}
                       </p>
                     </div>

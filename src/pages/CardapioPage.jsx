@@ -25,7 +25,7 @@ const MENU_CACHE_KEY = "anne_tom_menu_cache_v1";
 const OPENING_HOURS = {
   0: { open: 18 * 60, close: 23 * 60 }, // Domingo
   1: null, // Segunda fechado
-  2: { open: 18 * 60, close: 23 * 60 },
+  2: { open: 18 * 60, close: 24 * 60 },
   3: { open: 18 * 60, close: 23 * 60 },
   4: { open: 18 * 60, close: 23 * 60 },
   5: { open: 18 * 60, close: 23 * 60 },

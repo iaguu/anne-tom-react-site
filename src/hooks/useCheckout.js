@@ -4,7 +4,7 @@ import { useCart } from "../context/CartContext";
 
 /* ================= CONFIG: API DESKTOP ================== */
 
-const API_URL = "http://localhost:3030";
+const API_URL = "https://portalled-keshia-intolerable.ngrok-free.dev";
 
 /* ================= CONFIG: TAXA POR BAIRRO ================== */
 
@@ -127,7 +127,11 @@ async function enviarParaDesktop(items, dados, totalFinal, pagamento) {
 
     const res = await fetch(`${API_URL}/api/orders`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        "ngrok-skip-browser-warning": "true",
+      },
       body: JSON.stringify(payload),
     });
 
@@ -159,7 +163,14 @@ async function checkCustomerByPhone(phoneRaw) {
     const res = await fetch(
       `${API_URL}/api/customers/by-phone?phone=${encodeURIComponent(
         phoneDigits
-      )}`
+      )}`,
+      {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          "ngrok-skip-browser-warning": "true",
+        },
+      }
     );
 
     if (res.status === 404) {
@@ -201,7 +212,11 @@ async function salvarCliente(dadosCliente) {
   try {
     const res = await fetch(`${API_URL}/api/customers`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        "ngrok-skip-browser-warning": "true",
+      },
       body: JSON.stringify(payload),
     });
 
@@ -376,65 +391,63 @@ export function useCheckout() {
 
   /* =========== BUSCA DE CLIENTE POR TELEFONE =========== */
 
-const lastPhoneCheckedRef = useRef("");
+  const lastPhoneCheckedRef = useRef("");
 
-const onBuscarClientePorTelefone = async (telefoneAtual) => {
-  const phoneDigits = (telefoneAtual || "").replace(/\D/g, "");
+  const onBuscarClientePorTelefone = async (telefoneAtual) => {
+    const phoneDigits = (telefoneAtual || "").replace(/\D/g, "");
 
-  // 👉 se apagou o telefone
-  if (!phoneDigits) {
-    setErroClienteApi("");
-    setClienteExistente(null);
-    lastPhoneCheckedRef.current = "";
-    return;
-  }
+    // se apagou o telefone
+    if (!phoneDigits) {
+      setErroClienteApi("");
+      setClienteExistente(null);
+      lastPhoneCheckedRef.current = "";
+      return;
+    }
 
-  // 👉 se ainda não tem dígitos suficientes
-  if (phoneDigits.length < 10) return;
+    // se ainda não tem dígitos suficientes
+    if (phoneDigits.length < 10) return;
 
-  // 👉 impede busca repetida
-  if (checandoCliente) return;
+    // impede busca repetida
+    if (checandoCliente) return;
 
-  if (lastPhoneCheckedRef.current === phoneDigits) return;
-  lastPhoneCheckedRef.current = phoneDigits;
+    if (lastPhoneCheckedRef.current === phoneDigits) return;
+    lastPhoneCheckedRef.current = phoneDigits;
 
-  setChecandoCliente(true);
+    setChecandoCliente(true);
 
-  const resultado = await checkCustomerByPhone(telefoneAtual);
+    const resultado = await checkCustomerByPhone(telefoneAtual);
 
-  setChecandoCliente(false);
+    setChecandoCliente(false);
 
-  if (resultado.error) {
-    setErroClienteApi("Não foi possível consultar o cadastro agora.");
-    return;
-  }
+    if (resultado.error) {
+      setErroClienteApi("Não foi possível consultar o cadastro agora.");
+      return;
+    }
 
-  if (!resultado.found || !resultado.customer) {
-    setErroClienteApi(
-      "Cliente não encontrado. Complete seus dados para finalizar o cadastro."
-    );
-    setClienteExistente(null);
+    if (!resultado.found || !resultado.customer) {
+      setErroClienteApi(
+        "Cliente não encontrado. Complete seus dados para finalizar o cadastro."
+      );
+      setClienteExistente(null);
 
-    setDados((d) => ({ ...d, customerId: null }));
-    return;
-  }
+      setDados((d) => ({ ...d, customerId: null }));
+      return;
+    }
 
-  const c = resultado.customer;
-  setClienteExistente(c);
+    const c = resultado.customer;
+    setClienteExistente(c);
 
-  setErroClienteApi(""); // só some quando realmente encontrou
+    setErroClienteApi(""); // só some quando realmente encontrou
 
-  setDados((d) => ({
-    ...d,
-    customerId: c.id || d.customerId || null,
-    nome: c.name || d.nome,
-    cep: c.address?.cep || d.cep,
-    endereco: c.address?.street || d.endereco || "",
-    bairro: c.address?.neighborhood || d.bairro,
-  }));
-};
-
-
+    setDados((d) => ({
+      ...d,
+      customerId: c.id || d.customerId || null,
+      nome: c.name || d.nome,
+      cep: c.address?.cep || d.cep,
+      endereco: c.address?.street || d.endereco || "",
+      bairro: c.address?.neighborhood || d.bairro,
+    }));
+  };
 
   /* =========== NAVEGAÇÃO ENTRE ETAPAS =========== */
 
