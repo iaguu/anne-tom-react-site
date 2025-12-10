@@ -14,8 +14,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
+import server from "../api/server";
 
-const API_MENU_URL = "https://portalled-keshia-intolerable.ngrok-free.dev/api/menu";
 const MENU_CACHE_KEY = "anne_tom_menu_cache_v1";
 
 // Horários oficiais (Tripadvisor):
@@ -264,14 +264,7 @@ const fetchMenu = async () => {
     setMenuError("");
     setIsUsingCachedMenu(false);
 
-    const res = await fetch(API_MENU_URL, {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
-        // 🔑 evita a página de aviso/verificação do ngrok
-        "ngrok-skip-browser-warning": "true",
-      },
-    });
+    const res = await server.fetchMenu()
 
     if (!res.ok) {
       throw new Error(`Falha no menu (HTTP ${res.status})`);
