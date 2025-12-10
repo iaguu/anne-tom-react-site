@@ -1,70 +1,76 @@
-# Getting Started with Create React App
+# 🍕 Anne & Tom — React Website
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Frontend oficial do **site da Pizzaria Anne & Tom**, desenvolvido em **React + Vite** (ou CRA, conforme seu setup atual) e estruturado para oferecer uma experiência rápida, moderna e totalmente responsiva para os clientes, incluindo cardápio, promoções, informações da loja e fluxo de pedido integrado ao WhatsApp/PDV.
 
-## Available Scripts
+---
 
-In the project directory, you can run:
+## 🎯 Objetivo do Projeto
 
-### `npm start`
+Este repositório abriga o **site público** da Pizzaria Anne & Tom, pensado para:
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+- Apresentar o **cardápio digital** com categorias, sabores, combos e bebidas.
+- Direcionar clientes para pedidos por **WhatsApp**, **delivery**, ou integração futura com API própria.
+- Criar uma presença visual forte, moderna e personalizada da marca.
+- Servir como camada web do ecossistema Anne & Tom (Site → Electron PDV → App Motoboy).
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+---
 
-### `npm test`
+## ✨ Principais Recursos
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+### 🖥️ Interface Moderna  
+- Design inspirado em apps de delivery premium.  
+- Componentes reutilizáveis para seções como:  
+  - **Hero Section**,  
+  - **Mais Pedidas**,  
+  - **Veggies**,  
+  - **Destaques**,  
+  - **Seções promoncionais**,  
+  - **Footer institucional**.
 
-### `npm run build`
+### 📱 Totalmente Responsivo
+Funciona perfeitamente em celulares, tablets e desktops.
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+### ⚡ Performance
+- Build otimizado.  
+- Imagens otimizadas e carregamento progressivo.  
+- Lazy loading onde apropriado.
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+### 🍽️ Cardápio Dinâmico
+- Estrutura preparada para receber dados de forma centralizada.  
+- Possibilidade de integração futura com API / DataEngine do PDV.
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+### 🧭 Navegação fluida
+- React Router (ou estrutura modular de páginas).  
+- Links entre seções do cardápio com filtros via query params (`?veggie=true`, `?top=true`, etc.).
 
-### `npm run eject`
+### 🔧 Código Limpo e Organizável
+- Componentização clara.  
+- Pastas por contexto: `components`, `pages`, `assets`, `styles`.  
+- Padronização para fácil manutenção.
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+---
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+## 📂 Estrutura do Projeto
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+```plaintext
+anne-tom-react-site/
+├── public/
+├── src/
+│   ├── assets/        # Imagens, logos, ícones
+│   ├── components/    # Componentes reutilizáveis
+│   ├── pages/         # Páginas principais
+│   ├── hooks/         # Hooks personalizados
+│   ├── context/       # Contextos globais
+│   ├── styles/        # CSS/SCSS ou Tailwind
+│   ├── utils/         # Funções auxiliares
+│   └── App.jsx
+├── package.json
+└── README.md
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+▶️ Executando localmente
 
-## Learn More
+git clone https://github.com/iaguu/anne-tom-react-site.git
+cd anne-tom-react-site
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+npm install
+npm run dev     # ou npm start, dependendo do setup
