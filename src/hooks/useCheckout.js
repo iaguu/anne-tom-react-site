@@ -379,28 +379,28 @@ export function useCheckout() {
 const lastPhoneCheckedRef = useRef("");
 
 const onBuscarClientePorTelefone = async (telefoneAtual) => {
-  setErroClienteApi("");
-  setClienteExistente(null);
-
   const phoneDigits = (telefoneAtual || "").replace(/\D/g, "");
 
-  if (!phoneDigits || phoneDigits.length < 10) return;
+  // 👉 se apagou o telefone
+  if (!phoneDigits) {
+    setErroClienteApi("");
+    setClienteExistente(null);
+    lastPhoneCheckedRef.current = "";
+    return;
+  }
 
-  // 🔥 1) se já está consultando -> não chama de novo
+  // 👉 se ainda não tem dígitos suficientes
+  if (phoneDigits.length < 10) return;
+
+  // 👉 impede busca repetida
   if (checandoCliente) return;
 
-  // 🔥 2) evita repetir consulta se número é o mesmo
   if (lastPhoneCheckedRef.current === phoneDigits) return;
   lastPhoneCheckedRef.current = phoneDigits;
 
   setChecandoCliente(true);
 
-  let resultado;
-  try {
-    resultado = await checkCustomerByPhone(telefoneAtual);
-  } catch (err) {
-    resultado = { error: true };
-  }
+  const resultado = await checkCustomerByPhone(telefoneAtual);
 
   setChecandoCliente(false);
 
@@ -413,8 +413,8 @@ const onBuscarClientePorTelefone = async (telefoneAtual) => {
     setErroClienteApi(
       "Cliente não encontrado. Complete seus dados para finalizar o cadastro."
     );
+    setClienteExistente(null);
 
-    // importante: NÃO altera nada além de customerId 
     setDados((d) => ({ ...d, customerId: null }));
     return;
   }
@@ -422,7 +422,8 @@ const onBuscarClientePorTelefone = async (telefoneAtual) => {
   const c = resultado.customer;
   setClienteExistente(c);
 
-  // 🔥 não mexer no telefone para evitar novo trigger
+  setErroClienteApi(""); // só some quando realmente encontrou
+
   setDados((d) => ({
     ...d,
     customerId: c.id || d.customerId || null,
@@ -432,6 +433,7 @@ const onBuscarClientePorTelefone = async (telefoneAtual) => {
     bairro: c.address?.neighborhood || d.bairro,
   }));
 };
+
 
 
   /* =========== NAVEGAÇÃO ENTRE ETAPAS =========== */
