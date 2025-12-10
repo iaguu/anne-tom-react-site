@@ -35,31 +35,42 @@ const DadosStep = ({
     return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
   };
 
-  const handleTelefoneChange = (e) => {
-    const raw = e.target.value;
-    const masked = maskPhone(raw);
-    setDados({ ...dados, telefone: masked });
-  };
+const handleTelefoneChange = (e) => {
+  const raw = e.target.value;
+  const masked = maskPhone(raw);
+  setDados({ ...dados, telefone: masked });
+};
 
-  const phoneDigits = getPhoneDigits(dados.telefone);
-  const liberarCampos =
-    phoneDigits.length >= 10 &&
-    (tipoCliente === "existing" || tipoCliente === "novo");
+const phoneDigits = getPhoneDigits(dados.telefone);
+const liberarCampos =
+  phoneDigits.length >= 10 &&
+  (tipoCliente === "existing" || tipoCliente === "novo");
 
-  // auto-consulta na API quando é "Já sou cliente"
-  React.useEffect(() => {
-    if (
-      tipoCliente !== "existing" ||
-      !onBuscarClientePorTelefone ||
-      phoneDigits.length < 10
-    ) {
-      return;
-    }
-    const timeout = setTimeout(() => {
-      onBuscarClientePorTelefone(dados.telefone);
-    }, 500);
-    return () => clearTimeout(timeout);
-  }, [dados.telefone, phoneDigits, tipoCliente, onBuscarClientePorTelefone]);
+// auto-consulta na API quando é "Já sou cliente"
+React.useEffect(() => {
+  // só consulta para "Já sou cliente"
+  if (tipoCliente !== "existing") return;
+  if (!onBuscarClientePorTelefone) return;
+
+  // precisa ter pelo menos 10 dígitos
+  if (phoneDigits.length < 10) return;
+
+  // se já estiver consultando, não agenda outra
+  if (checandoCliente) return;
+
+  const timeout = setTimeout(() => {
+    // aqui usamos o telefone mascarado, o hook trata os dígitos
+    onBuscarClientePorTelefone(dados.telefone);
+  }, 800); // debounce mais curto e responsivo
+
+  return () => clearTimeout(timeout);
+}, [
+  tipoCliente,
+  phoneDigits,
+  checandoCliente,
+  onBuscarClientePorTelefone,
+  dados.telefone,
+]);
 
   return (
     <div className="space-y-6">

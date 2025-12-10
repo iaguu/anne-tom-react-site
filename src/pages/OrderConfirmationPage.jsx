@@ -5,51 +5,303 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 const formatCurrencyBRL = (value) =>
   Number(value || 0).toFixed(2).replace(".", ",");
 
+const API_BASE_URL =
+  process.env.REACT_APP_AT_API_BASE_URL || "https://portalled-keshia-intolerable.ngrok-free.dev";
+
+// -----------------------------
+// Helpers de status / ETA
+// -----------------------------
+const normalizeStatus = (status) => {
+  if (!status) return "open";
+  const s = status.toString().toLowerCase().trim();
+  if (s === "finalizado" || s === "done") return "done";
+  if (s === "cancelado" || s === "cancelled") return "cancelled";
+  if (["em_preparo", "preparo", "preparing"].includes(s)) return "preparing";
+  if (
+    s === "out_for_delivery" ||
+    s === "delivery" ||
+    s === "em_entrega" ||
+    s === "in_delivery"
+  ) {
+    return "out_for_delivery";
+  }
+  if (s === "open" || s === "em_aberto") return "open";
+  return s;
+};
+
+const STATUS_STEPS = [
+  { key: "open", label: "Pedido recebido" },
+  { key: "preparing", label: "Em preparo" },
+  { key: "out_for_delivery", label: "Saiu para entrega" },
+  { key: "done", label: "Entregue" },
+];
+
+const getStepIndex = (statusKey) => {
+  const normalized = normalizeStatus(statusKey);
+  if (normalized === "done") return 3;
+  if (normalized === "out_for_delivery") return 2;
+  if (normalized === "preparing") return 1;
+  if (normalized === "cancelled") return 2;
+  return 0;
+};
+
+const statusLabelForCustomer = (statusKey) => {
+  const s = normalizeStatus(statusKey);
+  if (s === "open") return "Pedido recebido";
+  if (s === "preparing") return "Em preparação";
+  if (s === "out_for_delivery") return "Saiu para entrega";
+  if (s === "done") return "Entregue";
+  if (s === "cancelled") return "Pedido cancelado";
+  return s;
+};
+
+const etaTextForStatus = (statusKey, bairro) => {
+  const s = normalizeStatus(statusKey);
+  if (s === "open" || s === "preparing") {
+    return bairro
+      ? `35 a 55 minutos na região de ${bairro}`
+      : "35 a 55 minutos";
+  }
+  if (s === "out_for_delivery") {
+    return "Seu pedido saiu para entrega e deve chegar em poucos minutos.";
+  }
+  if (s === "done") {
+    return "Pedido finalizado. Qualquer coisa, chama a gente no WhatsApp. ❤️";
+  }
+  if (s === "cancelled") {
+    return "Pedido cancelado. Se for um engano, fale com a gente pelo WhatsApp.";
+  }
+  return null;
+};
+
 const OrderConfirmationPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
   const [resumo, setResumo] = useState(null);
 
+  // 🔑 ID usado para bater no endpoint /motoboy/pedido/:id
+  const [trackingId, setTrackingId] = useState(null);
+
+  // dados em tempo real retornados pela API
+  const [trackingData, setTrackingData] = useState(null);
+  const [trackingStatus, setTrackingStatus] = useState("open");
+  const [trackingLoading, setTrackingLoading] = useState(false);
+  const [trackingError, setTrackingError] = useState(null);
+
+  // -------------------------------------------------------------------
+  // 1) Resolver resumo + trackingId (URL + state + localStorage)
+  // -------------------------------------------------------------------
   useEffect(() => {
-    // 1) Tenta via state (navegação direta do checkout)
-    if (location.state?.orderSummary) {
-      setResumo(location.state.orderSummary);
+    let summary = null;
+
+    // a) state vindo do navigate()
+    if (location.state && location.state.orderSummary) {
+      summary = location.state.orderSummary;
+    } else {
+      // b) fallback – último resumo salvo
       try {
-        localStorage.setItem(
-          "lastOrderSummary",
-          JSON.stringify(location.state.orderSummary)
-        );
+        const salvo = localStorage.getItem("lastOrderSummary");
+        if (salvo) summary = JSON.parse(salvo);
       } catch {
-        // ignora erros de storage
+        // ignora
       }
-      return;
     }
 
-    // 2) Fallback via localStorage (reload / volta)
-    try {
-      const salvo = localStorage.getItem("lastOrderSummary");
-      if (salvo) {
-        setResumo(JSON.parse(salvo));
+    if (summary) {
+      setResumo(summary);
+      // regrava pra manter sincronizado
+      try {
+        localStorage.setItem("lastOrderSummary", JSON.stringify(summary));
+      } catch {
+        // ignora
       }
-    } catch {
-      // ignora
     }
+
+    // c) ID bruto vindo pela URL (?orderId=orders-...)
+    let fromUrl = null;
+    try {
+      const searchParams = new URLSearchParams(window.location.search || "");
+      fromUrl =
+        searchParams.get("orderId") || searchParams.get("tracking") || null;
+    } catch {
+      fromUrl = null;
+    }
+
+    // d) ID vindo pelo state
+    const fromStateTracking =
+      location.state?.trackingId ||
+      location.state?.backendOrderId ||
+      location.state?.orderIdApi ||
+      null;
+
+    // e) ID vindo de dentro do resumo
+    const fromSummary =
+      summary?.backendOrderId ||
+      summary?.trackingId ||
+      summary?.orderIdApi ||
+      summary?.order?.id ||
+      null;
+
+    const resolved = fromUrl || fromStateTracking || fromSummary || null;
+
+    setTrackingId(resolved);
+
+    console.log("[OrderConfirmation] trackingId resolvido:", {
+      fromUrl,
+      fromStateTracking,
+      fromSummary,
+      resolved,
+    });
   }, [location.state]);
 
+  // -------------------------------------------------------------------
+  // Derivados para mostrar na tela
+  // -------------------------------------------------------------------
   const semResumo = !resumo || !resumo.items || !resumo.items.length;
 
   const totalItens = semResumo
     ? 0
-    : resumo.items.reduce((acc, item) => acc + Number(item.quantidade || 0), 0);
+    : resumo.items.reduce(
+        (acc, item) => acc + Number(item.quantidade || 0),
+        0
+      );
 
-  // Se a API/checkout mandar algum identificador, a gente exibe
+  // Número amigável exibido (#92336)
   const codigoPedido =
+    resumo?.numeroPedidoDisplay ||
+    resumo?.orderCode ||
     resumo?.codigoPedido ||
     resumo?.idPedido ||
     resumo?.numeroPedido ||
+    (trackingData?.id
+      ? String(trackingData.id).split("-")[
+          String(trackingData.id).split("-").length - 1
+        ]
+      : null) ||
+    (trackingId
+      ? String(trackingId).split("-")[
+          String(trackingId).split("-").length - 1
+        ]
+      : null);
+
+  const bairroResumo =
+    resumo?.dados?.bairro ||
+    trackingData?.customerSnapshot?.address?.neighborhood ||
     null;
 
+  const effectiveStatus = trackingId ? trackingStatus : "preparing";
+  const stepIndex = getStepIndex(effectiveStatus);
+  const statusLabel = statusLabelForCustomer(effectiveStatus);
+  const etaText = etaTextForStatus(effectiveStatus, bairroResumo);
+
+  const motoboySnapshot =
+    trackingData?.motoboySnapshot ||
+    trackingData?.delivery?.motoboySnapshot ||
+    null;
+
+  const motoboy = motoboySnapshot
+    ? {
+        name: motoboySnapshot.name,
+        phone: motoboySnapshot.phone,
+      }
+    : trackingData?.motoboyName
+    ? {
+        name: trackingData.motoboyName,
+        phone: trackingData.motoboyPhone || null,
+      }
+    : null;
+
+  // -------------------------------------------------------------------
+  // 2) Polling em tempo real – agora lendo data.items[0] ou data.order
+  // -------------------------------------------------------------------
+  useEffect(() => {
+    if (!trackingId) {
+      return;
+    }
+
+    let cancelled = false;
+    let intervalId = null;
+
+    const fetchStatus = async () => {
+      try {
+        setTrackingLoading(true);
+        setTrackingError(null);
+
+        console.log(
+          "[OrderConfirmation] buscando status em tempo real para:",
+          trackingId
+        );
+        console.log("[OrderConfirmation] API_BASE_URL:", API_BASE_URL);
+
+        const resp = await fetch(
+          `${API_BASE_URL}/motoboy/pedido/${encodeURIComponent(trackingId)}`
+        );
+
+        if (!resp.ok) {
+          throw new Error(`HTTP ${resp.status}`);
+        }
+
+        const data = await resp.json();
+        if (cancelled) return;
+
+        console.log("[OrderConfirmation] resposta do tracking:", data);
+
+        // 🔴 AQUI o ajuste pro formato real:
+        // - se vier { items: [ {...} ] }, pega o primeiro
+        // - se vier { order: {...} }, usa order
+        let order = null;
+        if (Array.isArray(data.items) && data.items.length > 0) {
+          order = data.items[0];
+        } else if (data.order) {
+          order = data.order;
+        } else {
+          order = null;
+        }
+
+        // se ainda assim não tiver nada, não quebra a tela
+        if (!order) {
+          console.warn(
+            "[OrderConfirmation] Nenhum pedido encontrado no retorno do tracking."
+          );
+          return;
+        }
+
+        const rawStatus =
+          // status principal do pedido
+          order.status ||
+          order.orderStatus ||
+          // status do motoboy (delivering/out_for_delivery)
+          order.motoboyStatus ||
+          data.status ||
+          data.orderStatus ||
+          "open";
+
+        setTrackingData(order);
+        setTrackingStatus(normalizeStatus(rawStatus || "open"));
+      } catch (err) {
+        if (cancelled) return;
+        console.error("[OrderConfirmation] erro ao buscar status:", err);
+        setTrackingError("Não foi possível atualizar o status em tempo real.");
+      } finally {
+        if (!cancelled) {
+          setTrackingLoading(false);
+        }
+      }
+    };
+
+    fetchStatus();
+    intervalId = window.setInterval(fetchStatus, 10000);
+
+    return () => {
+      cancelled = true;
+      if (intervalId) window.clearInterval(intervalId);
+    };
+  }, [trackingId]);
+
+  // -------------------------------------------------------------------
+  // UI (layout original, sem mudanças visuais drásticas)
+  // -------------------------------------------------------------------
   return (
     <div className="min-h-screen bg-gradient-to-b from-white via-slate-50 to-slate-100 text-slate-900 flex flex-col">
       {/* HEADER */}
@@ -99,34 +351,126 @@ const OrderConfirmationPage = () => {
                     <span className="font-semibold text-slate-700">
                       Número do pedido:&nbsp;
                     </span>
-                    {codigoPedido}
+                    #{codigoPedido}
+                  </p>
+                )}
+                {trackingId && (
+                  <p className="text-[10px] text-emerald-700 mt-0.5">
+                    Acompanhando seu pedido em tempo real.
                   </p>
                 )}
               </div>
             </div>
 
-            {/* STATUS / PRAZO */}
-            <div className="bg-slate-50 rounded-2xl px-4 py-3 text-xs flex flex-col gap-1 border border-slate-100">
+            {/* STATUS / PRAZO + STEPPER */}
+            <div className="bg-slate-50 rounded-2xl px-4 py-3 text-xs flex flex-col gap-2 border border-slate-100">
               <div className="flex justify-between items-center">
-                <span className="text-slate-500">Status inicial</span>
+                <span className="text-slate-500">
+                  {trackingId ? "Status do pedido" : "Status inicial"}
+                </span>
                 <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-100 text-[10px] font-semibold text-emerald-700">
-                  Em preparação
+                  {statusLabel}
+                  {trackingLoading && (
+                    <span className="ml-1 animate-pulse">•</span>
+                  )}
                 </span>
               </div>
-              <p className="flex justify-between">
-                <span className="text-slate-500">Previsão de entrega</span>
-                <span className="font-semibold text-slate-800">
-                  35 a 55 minutos
-                </span>
-              </p>
-              {resumo?.dados?.bairro && (
+
+              {etaText && (
                 <p className="flex justify-between">
-                  <span className="text-slate-500">Bairro</span>
-                  <span className="font-semibold text-slate-800">
-                    {resumo.dados.bairro}
+                  <span className="text-slate-500">Previsão de entrega</span>
+                  <span className="font-semibold text-slate-800 text-right">
+                    {etaText}
                   </span>
                 </p>
               )}
+
+              {bairroResumo && (
+                <p className="flex justify-between">
+                  <span className="text-slate-500">Bairro</span>
+                  <span className="font-semibold text-slate-800">
+                    {bairroResumo}
+                  </span>
+                </p>
+              )}
+
+              {motoboy && (
+                <p className="flex justify-between">
+                  <span className="text-slate-500">Motoboy</span>
+                  <span className="font-semibold text-slate-800 text-right">
+                    {motoboy.name}
+                    {motoboy.phone && (
+                      <span className="text-[10px] text-slate-500 ml-1">
+                        ({motoboy.phone})
+                      </span>
+                    )}
+                  </span>
+                </p>
+              )}
+
+              {trackingError && (
+                <p className="mt-1 text-[10px] text-amber-700">
+                  {trackingError} Seu pedido continua válido; apenas o
+                  acompanhamento automático pode ficar temporariamente
+                  indisponível.
+                </p>
+              )}
+
+              {/* Stepper visual */}
+              <div className="mt-2 pt-2 border-t border-slate-100">
+                <div className="flex items-center justify-between gap-2">
+                  {STATUS_STEPS.map((step, index) => {
+                    const active = index <= stepIndex;
+                    const isCurrent = index === stepIndex;
+
+                    return (
+                      <div
+                        key={step.key}
+                        className="flex-1 flex flex-col items-center"
+                      >
+                        <div className="flex items-center w-full">
+                          <div className="flex-1 h-[2px]">
+                            {index > 0 && (
+                              <div
+                                className={`h-[2px] ${
+                                  index <= stepIndex
+                                    ? "bg-emerald-500"
+                                    : "bg-slate-200"
+                                }`}
+                              />
+                            )}
+                          </div>
+                          <div
+                            className={[
+                              "w-6 h-6 rounded-full border flex items-center justify-center text-[10px]",
+                              active
+                                ? "bg-emerald-500 border-emerald-500 text-white"
+                                : "bg-white border-slate-300 text-slate-400",
+                              isCurrent ? "ring-2 ring-emerald-300" : "",
+                            ]
+                              .filter(Boolean)
+                              .join(" ")}
+                          >
+                            {index + 1}
+                          </div>
+                          <div className="flex-1 h-[2px]" />
+                        </div>
+                        <div className="mt-1 text-[9px] text-center leading-tight">
+                          <p
+                            className={
+                              active
+                                ? "font-semibold text-slate-800"
+                                : "text-slate-400"
+                            }
+                          >
+                            {step.label}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
 
             {/* RESUMO DO PEDIDO */}
@@ -215,8 +559,8 @@ const OrderConfirmationPage = () => {
               </div>
             )}
 
-            {/* DADOS DO CLIENTe */}
-            {resumo?.dados && (
+            {/* DADOS DO CLIENTE */}
+            {resumo && resumo.dados && (
               <div className="border-t border-slate-100 pt-4 text-[11px] space-y-1">
                 <p className="text-slate-500 font-semibold text-xs">
                   Dados do cliente
@@ -224,9 +568,7 @@ const OrderConfirmationPage = () => {
                 {resumo.dados.nome && (
                   <p>
                     <span className="text-slate-500">Nome: </span>
-                    <span className="font-medium">
-                      {resumo.dados.nome}
-                    </span>
+                    <span className="font-medium">{resumo.dados.nome}</span>
                   </p>
                 )}
                 {resumo.dados.telefone && (
@@ -277,7 +619,6 @@ const OrderConfirmationPage = () => {
             </div>
           </div>
 
-          {/* Mensagem extra embaixo */}
           <p className="mt-4 text-[11px] text-center text-slate-500">
             Se precisar ajustar algo no pedido, envie uma mensagem pelo WhatsApp
             o quanto antes. A equipe da Anne &amp; Tom te ajuda rapidinho.

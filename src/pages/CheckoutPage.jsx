@@ -1,6 +1,6 @@
 // src/pages/CheckoutPage.jsx
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useCheckout } from "../hooks/useCheckout";
 
 import CarrinhoStep from "../components/checkout/CarrinhoStep";
@@ -11,6 +11,8 @@ import ResumoLateral from "../components/checkout/ResumoLateral";
 import ResumoMobile from "../components/checkout/ResumoMobile";
 
 const CheckoutPage = () => {
+  const navigate = useNavigate();
+
   const {
     // cart
     items,
@@ -65,6 +67,107 @@ const CheckoutPage = () => {
     // envio
     enviarPedido,
   } = useCheckout();
+
+  /**
+   * Handler de envio:
+   * espera que `enviarPedido()` retorne algo como:
+   * {
+   *   success: true,
+   *   order,          // objeto vindo do apiServer (orders-...)
+   *   orderSummary,   // resumo que a gente monta pro front
+   * }
+   */
+  const handleEnviarPedido = async () => {
+    if (!podeEnviar || enviando) return;
+
+    try {
+      const result = await enviarPedido();
+
+      console.log("[CheckoutPage] resultado enviarPedido:", result);
+
+      // se o hook não retornar nada ou der erro silencioso, não faz nada
+      if (!result || result.success === false) {
+        console.warn(
+          "[CheckoutPage] enviarPedido não retornou resultado válido:",
+          result
+        );
+        return;
+      }
+
+      const {
+        order,
+        orderSummary,
+        orderId,
+        idPedido,
+        codigoPedido,
+        numeroPedido,
+        backendOrderId: backendOrderIdFromResult,
+        trackingId: trackingIdFromResult,
+        items,
+        orders,
+      } = result;
+
+      const firstOrderFromArray =
+        Array.isArray(orders) && orders.length > 0 ? orders[0] : null;
+      const firstItemFromArray =
+        Array.isArray(items) && items.length > 0 ? items[0] : null;
+
+      // tenta descobrir o id real do pedido criado no backend (o mesmo do PDV / motoboy)
+      const backendOrderId =
+        trackingIdFromResult ||
+        backendOrderIdFromResult ||
+        orderId ||
+        idPedido ||
+        codigoPedido ||
+        numeroPedido ||
+        order?.id ||
+        order?.orderId ||
+        firstOrderFromArray?.id ||
+        firstOrderFromArray?.orderId ||
+        firstItemFromArray?.id ||
+        orderSummary?.backendOrderId ||
+        orderSummary?.idPedidoApi ||
+        null;
+
+      console.log("[CheckoutPage] backendOrderId resolvido:", backendOrderId);
+
+      if (!backendOrderId) {
+        console.warn(
+          "[CheckoutPage] Pedido criado, mas NÃO foi possível encontrar um ID para tracking.",
+          { result }
+        );
+      }
+
+      const summaryToSend = {
+        ...(orderSummary || {}),
+        backendOrderId,
+        trackingId: backendOrderId,
+        orderIdApi: backendOrderId,
+      };
+
+      try {
+        localStorage.setItem("lastOrderSummary", JSON.stringify(summaryToSend));
+      } catch (e) {
+        console.warn("[CheckoutPage] Falha ao salvar lastOrderSummary:", e);
+      }
+
+      navigate(
+        backendOrderId
+          ? `/confirmacao?orderId=${encodeURIComponent(backendOrderId)}`
+          : "/confirmacao",
+        {
+          state: {
+            orderSummary: summaryToSend,
+            trackingId: backendOrderId,
+            backendOrderId,
+          },
+        }
+      );
+    } catch (err) {
+      console.error("[CheckoutPage] erro ao enviar pedido:", err);
+      // aqui você pode exibir algum toast/alert futuramente
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -173,7 +276,6 @@ const CheckoutPage = () => {
                 ← Voltar
               </button>
 
-              {/* Avançar (0 e 1) */}
               {passo < 2 && (
                 <button
                   onClick={avancar}
@@ -188,7 +290,6 @@ const CheckoutPage = () => {
                 </button>
               )}
 
-              {/* Ir para pagamento na etapa de revisão */}
               {passo === 2 && (
                 <button
                   onClick={avancar}
@@ -198,10 +299,9 @@ const CheckoutPage = () => {
                 </button>
               )}
 
-              {/* Enviar pedido */}
               {passo === 3 && (
                 <button
-                  onClick={enviarPedido}
+                  onClick={handleEnviarPedido}
                   disabled={!podeEnviar}
                   className={`px-7 py-3 rounded-full text-xs font-semibold ${
                     podeEnviar

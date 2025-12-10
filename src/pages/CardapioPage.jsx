@@ -15,7 +15,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
 
-const API_MENU_URL = "http://localhost:3030/api/menu";
+const API_MENU_URL = "https://portalled-keshia-intolerable.ngrok-free.dev/api/menu";
 const MENU_CACHE_KEY = "anne_tom_menu_cache_v1";
 
 // Horários oficiais (Tripadvisor):
@@ -23,13 +23,13 @@ const MENU_CACHE_KEY = "anne_tom_menu_cache_v1";
 // Segunda: fechado
 // Terça a Sábado: 19:00–23:00
 const OPENING_HOURS = {
-  0: { open: 19 * 60, close: 23 * 60 }, // Domingo
+  0: { open: 18 * 60, close: 23 * 60 }, // Domingo
   1: null, // Segunda fechado
-  2: { open: 19 * 60, close: 23 * 60 },
-  3: { open: 19 * 60, close: 23 * 60 },
-  4: { open: 19 * 60, close: 23 * 60 },
-  5: { open: 19 * 60, close: 23 * 60 },
-  6: { open: 19 * 60, close: 23 * 60 }, // Sábado
+  2: { open: 18 * 60, close: 23 * 60 },
+  3: { open: 18 * 60, close: 23 * 60 },
+  4: { open: 18 * 60, close: 23 * 60 },
+  5: { open: 18 * 60, close: 23 * 60 },
+  6: { open: 18 * 60, close: 23 * 60 }, // Sábado
 };
 
 const OPENING_LABEL = "Terça a domingo das 19h às 23h (segunda fechado)";
@@ -258,66 +258,87 @@ const CardapioPage = () => {
   useEffect(() => {
     let isMounted = true;
 
-    const fetchMenu = async () => {
-      try {
-        setLoadingMenu(true);
-        setMenuError("");
-        setIsUsingCachedMenu(false);
+const fetchMenu = async () => {
+  try {
+    setLoadingMenu(true);
+    setMenuError("");
+    setIsUsingCachedMenu(false);
 
-        const res = await fetch(API_MENU_URL);
-        if (!res.ok) throw new Error("Falha no menu");
-        const data = await res.json();
+    const res = await fetch(API_MENU_URL, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        // 🔑 evita a página de aviso/verificação do ngrok
+        "ngrok-skip-browser-warning": "true",
+      },
+    });
 
-        if (!isMounted) return;
+    if (!res.ok) {
+      throw new Error(`Falha no menu (HTTP ${res.status})`);
+    }
 
-        setMenuData(data);
-        setIsUsingCachedMenu(false);
+    const contentType = res.headers.get("content-type") || "";
 
-        // salva no localStorage
-        try {
-          const payload = {
-            data,
-            savedAt: new Date().toISOString(),
-          };
-          window.localStorage?.setItem(
-            MENU_CACHE_KEY,
-            JSON.stringify(payload)
-          );
-        } catch (storageErr) {
-          console.warn(
-            "[Cardapio] Não foi possível salvar cache local:",
-            storageErr
-          );
-        }
-      } catch (err) {
-        console.error("[Cardapio] Erro ao buscar API de menu:", err);
+    // se não for JSON, provavelmente voltou HTML de aviso
+    if (!contentType.includes("application/json")) {
+      const text = await res.text();
+      console.error(
+        "[Cardapio] Resposta não JSON da API (provavelmente HTML do Ngrok):",
+        text.slice(0, 400)
+      );
+      throw new Error("Resposta da API não está em JSON.");
+    }
 
-        if (!isMounted) return;
+    const data = await res.json();
 
-        // tenta cache local
-        try {
-          const cachedRaw = window.localStorage?.getItem(MENU_CACHE_KEY);
-          if (cachedRaw) {
-            const cached = JSON.parse(cachedRaw);
-            setMenuData(cached.data);
-            setIsUsingCachedMenu(true);
-            setMenuError(
-              "Não foi possível conectar à API. Usando cardápio salvo neste dispositivo."
-            );
-          } else {
-            setMenuError("Erro ao carregar cardápio. Tente novamente.");
-          }
-        } catch (cacheErr) {
-          console.error(
-            "[Cardapio] Erro ao ler cache local:",
-            cacheErr
-          );
-          setMenuError("Erro ao carregar cardápio. Tente novamente.");
-        }
-      } finally {
-        if (isMounted) setLoadingMenu(false);
+    if (!isMounted) return;
+
+    setMenuData(data);
+    setIsUsingCachedMenu(false);
+
+    // salva no localStorage
+    try {
+      const payload = {
+        data,
+        savedAt: new Date().toISOString(),
+      };
+      window.localStorage?.setItem(
+        MENU_CACHE_KEY,
+        JSON.stringify(payload)
+      );
+    } catch (storageErr) {
+      console.warn(
+        "[Cardapio] Não foi possível salvar cache local:",
+        storageErr
+      );
+    }
+  } catch (err) {
+    console.error("[Cardapio] Erro ao buscar API de menu:", err);
+
+    if (!isMounted) return;
+
+    // tenta cache local
+    try {
+      const cachedRaw = window.localStorage?.getItem(MENU_CACHE_KEY);
+      if (cachedRaw) {
+        const cached = JSON.parse(cachedRaw);
+        setMenuData(cached.data);
+        setIsUsingCachedMenu(true);
+        setMenuError(
+          "Não foi possível conectar à API. Usando cardápio salvo neste dispositivo."
+        );
+      } else {
+        setMenuError("Erro ao carregar cardápio. Tente novamente.");
       }
-    };
+    } catch (cacheErr) {
+      console.error("[Cardapio] Erro ao ler cache local:", cacheErr);
+      setMenuError("Erro ao carregar cardápio. Tente novamente.");
+    }
+  } finally {
+    if (isMounted) setLoadingMenu(false);
+  }
+};
+
 
     fetchMenu();
     return () => {

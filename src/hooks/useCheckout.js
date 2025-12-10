@@ -1,6 +1,5 @@
 // src/hooks/useCheckout.js
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useRef, useEffect, useMemo, useState } from "react";
 import { useCart } from "../context/CartContext";
 
 /* ================= CONFIG: API DESKTOP ================== */
@@ -233,8 +232,6 @@ export function useCheckout() {
     addItem,
   } = useCart();
 
-  const navigate = useNavigate();
-
   // 0: Carrinho | 1: Dados | 2: Revisão | 3: Pagamento
   const [passo, setPasso] = useState(0);
   const [pagamento, setPagamento] = useState("pix");
@@ -379,47 +376,63 @@ export function useCheckout() {
 
   /* =========== BUSCA DE CLIENTE POR TELEFONE =========== */
 
-  const onBuscarClientePorTelefone = async (telefoneAtual) => {
-    setErroClienteApi("");
-    setClienteExistente(null);
+const lastPhoneCheckedRef = useRef("");
 
-    const phoneDigits = (telefoneAtual || "").replace(/\D/g, "");
-    if (!phoneDigits || phoneDigits.length < 10) {
-      return;
-    }
+const onBuscarClientePorTelefone = async (telefoneAtual) => {
+  setErroClienteApi("");
+  setClienteExistente(null);
 
-    setChecandoCliente(true);
+  const phoneDigits = (telefoneAtual || "").replace(/\D/g, "");
 
-    const resultado = await checkCustomerByPhone(telefoneAtual);
+  if (!phoneDigits || phoneDigits.length < 10) return;
 
-    setChecandoCliente(false);
+  // 🔥 1) se já está consultando -> não chama de novo
+  if (checandoCliente) return;
 
-    if (resultado.error) {
-      setErroClienteApi("Não foi possível consultar o cadastro agora.");
-      return;
-    }
+  // 🔥 2) evita repetir consulta se número é o mesmo
+  if (lastPhoneCheckedRef.current === phoneDigits) return;
+  lastPhoneCheckedRef.current = phoneDigits;
 
-    if (!resultado.found || !resultado.customer) {
-      setErroClienteApi(
-        "Cliente não encontrado. Complete seus dados para finalizar o cadastro."
-      );
-      setDados((d) => ({ ...d, customerId: null }));
-      return;
-    }
+  setChecandoCliente(true);
 
-    const c = resultado.customer;
-    setClienteExistente(c);
+  let resultado;
+  try {
+    resultado = await checkCustomerByPhone(telefoneAtual);
+  } catch (err) {
+    resultado = { error: true };
+  }
 
-    setDados((d) => ({
-      ...d,
-      customerId: c.id || d.customerId || null,
-      nome: c.name || d.nome,
-      telefone: c.phone || d.telefone,
-      cep: c.address?.cep || d.cep,
-      endereco: c.address?.street || d.endereco || "",
-      bairro: c.address?.neighborhood || d.bairro,
-    }));
-  };
+  setChecandoCliente(false);
+
+  if (resultado.error) {
+    setErroClienteApi("Não foi possível consultar o cadastro agora.");
+    return;
+  }
+
+  if (!resultado.found || !resultado.customer) {
+    setErroClienteApi(
+      "Cliente não encontrado. Complete seus dados para finalizar o cadastro."
+    );
+
+    // importante: NÃO altera nada além de customerId 
+    setDados((d) => ({ ...d, customerId: null }));
+    return;
+  }
+
+  const c = resultado.customer;
+  setClienteExistente(c);
+
+  // 🔥 não mexer no telefone para evitar novo trigger
+  setDados((d) => ({
+    ...d,
+    customerId: c.id || d.customerId || null,
+    nome: c.name || d.nome,
+    cep: c.address?.cep || d.cep,
+    endereco: c.address?.street || d.endereco || "",
+    bairro: c.address?.neighborhood || d.bairro,
+  }));
+};
+
 
   /* =========== NAVEGAÇÃO ENTRE ETAPAS =========== */
 
@@ -434,7 +447,13 @@ export function useCheckout() {
   /* =========== ENVIO FINAL DO PEDIDO =========== */
 
   const enviarPedido = async () => {
-    if (!podeEnviar) return;
+    if (!podeEnviar) {
+      return {
+        success: false,
+        error: "Dados incompletos para enviar o pedido.",
+      };
+    }
+
     setEnviando(true);
 
     try {
@@ -448,7 +467,7 @@ export function useCheckout() {
         }
       }
 
-      // 2) monta dados completos
+      // 2) monta dados completos pro resumo / API
       const payloadCliente = {
         ...dados,
         customerId: customerIdAtual,
@@ -457,6 +476,45 @@ export function useCheckout() {
         desconto,
       };
 
+      // 3) envia para desktop
+      const desktopResult = await enviarParaDesktop(
+        items,
+        payloadCliente,
+        totalFinal,
+        pagamento
+      );
+
+      // tenta extrair o pedido criado e o ID do backend
+      let order = null;
+      let backendOrderId = null;
+
+      if (desktopResult && desktopResult.ok && desktopResult.data) {
+        const data = desktopResult.data;
+        if (data.order) {
+          order = data.order;
+        } else if (Array.isArray(data.items) && data.items.length > 0) {
+          order = data.items[0];
+        } else {
+          order = data;
+        }
+
+        backendOrderId =
+          order?.id ||
+          data.orderId ||
+          data.id ||
+          (Array.isArray(data.items) && data.items[0]?.id) ||
+          null;
+      }
+
+      // número "humano" pra exibir (#12345)
+      const numeroPedidoHuman =
+        order?.numeroPedido ||
+        order?.codigoPedido ||
+        (backendOrderId
+          ? String(backendOrderId).split("-").slice(-1)[0]
+          : null);
+
+      // 4) monta resumo pro front
       const orderSummary = {
         items,
         subtotal,
@@ -475,21 +533,35 @@ export function useCheckout() {
           totalFinal,
           pagamento
         ),
+        numeroPedido: numeroPedidoHuman,
+        codigoPedido: numeroPedidoHuman,
+        backendOrderId,
+        trackingId: backendOrderId,
       };
 
-      // 3) envia para desktop
-      await enviarParaDesktop(items, payloadCliente, totalFinal, pagamento);
-
-      // 4) salva resumo local
+      // 5) salva resumo local
       try {
         localStorage.setItem("lastOrderSummary", JSON.stringify(orderSummary));
       } catch {
         // ignora
       }
 
-      // 5) limpa carrinho + navega
+      // 6) limpa carrinho
       clearCart();
-      navigate("/confirmacao", { state: { orderSummary } });
+
+      // 7) devolve tudo pro CheckoutPage
+      return {
+        success: !!desktopResult?.ok,
+        order,
+        orderSummary,
+        orderId: backendOrderId,
+        backendOrderId,
+        trackingId: backendOrderId,
+        raw: desktopResult,
+      };
+    } catch (err) {
+      console.error("[useCheckout] erro ao enviar pedido:", err);
+      return { success: false, error: err.message };
     } finally {
       setEnviando(false);
     }
