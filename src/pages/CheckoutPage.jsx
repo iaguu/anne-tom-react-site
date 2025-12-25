@@ -16,7 +16,6 @@ const CheckoutPage = () => {
   const {
     // cart
     items,
-    total,
     totalItens,
 
     // etapas
@@ -58,6 +57,9 @@ const CheckoutPage = () => {
     totalFinal,
     podeEnviar,
     enviando,
+    deliveryEta,
+    deliveryEtaLoading,
+    deliveryEtaError,
 
     // cart actions
     updateQuantity,
@@ -175,9 +177,11 @@ const CheckoutPage = () => {
       <header className="border-b bg-white">
         <div className="max-w-6xl mx-auto h-16 px-4 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-full bg-slate-900 text-white text-xs font-black flex items-center justify-center">
-              A&amp;T
-            </div>
+            <img
+              src="/logopizzaria.png"
+              alt="Anne & Tom Pizzaria"
+              className="w-10 h-10 object-contain"
+            />
             <div className="leading-tight">
               <p className="text-sm font-semibold">Checkout</p>
               <p className="text-[11px] text-slate-500">
@@ -240,6 +244,9 @@ const CheckoutPage = () => {
                 onBuscarClientePorTelefone={onBuscarClientePorTelefone}
                 tipoCliente={tipoCliente}
                 setTipoCliente={setTipoCliente}
+                deliveryEta={deliveryEta}
+                deliveryEtaLoading={deliveryEtaLoading}
+                deliveryEtaError={deliveryEtaError}
               />
             )}
 

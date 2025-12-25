@@ -25,6 +25,12 @@ const getTaxaPorBairro = (bairro) => {
   return 0;
 };
 
+const DISTANCE_MATRIX_API_KEY =
+  process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "";
+const DELIVERY_ORIGIN =
+  process.env.REACT_APP_DELIVERY_ORIGIN ||
+  "Pizzaria Anne & Tom, Alto de Santana, Sao Paulo";
+
 /* ================= WHATSAPP BUILDER ================== */
 
 const montarTextoWhatsApp = (itens, cliente, totalFinal, pagamento) => {
@@ -247,6 +253,9 @@ export function useCheckout() {
   const [erroCep, setErroCep] = useState("");
 
   const [enviando, setEnviando] = useState(false);
+  const [deliveryEta, setDeliveryEta] = useState(null);
+  const [deliveryEtaLoading, setDeliveryEtaLoading] = useState(false);
+  const [deliveryEtaError, setDeliveryEtaError] = useState("");
 
   const etapas = ["Carrinho", "Dados", "Revisão", "Pagamento"];
 
@@ -325,6 +334,81 @@ export function useCheckout() {
       setDados((d) => ({ ...d, desconto: 0 }));
     }
   };
+
+  /* =========== ETA ENTREGA (DISTANCE MATRIX) =========== */
+
+  useEffect(() => {
+    if (dados.retirada) {
+      setDeliveryEta(null);
+      setDeliveryEtaError("");
+      return;
+    }
+
+    if (!DISTANCE_MATRIX_API_KEY) {
+      return;
+    }
+
+    const destination = [dados.endereco, dados.bairro]
+      .filter(Boolean)
+      .join(", ");
+
+    if (!destination || destination.length < 5) {
+      setDeliveryEta(null);
+      setDeliveryEtaError("");
+      return;
+    }
+
+    let cancelled = false;
+    const timeout = setTimeout(async () => {
+      try {
+        setDeliveryEtaLoading(true);
+        setDeliveryEtaError("");
+
+        const params = new URLSearchParams({
+          origins: DELIVERY_ORIGIN,
+          destinations: destination,
+          key: DISTANCE_MATRIX_API_KEY,
+          language: "pt-BR",
+          region: "br",
+        });
+
+        const resp = await fetch(
+          `https://maps.googleapis.com/maps/api/distancematrix/json?${params.toString()}`
+        );
+
+        if (!resp.ok) {
+          throw new Error(`HTTP ${resp.status}`);
+        }
+
+        const data = await resp.json();
+        const element = data?.rows?.[0]?.elements?.[0];
+
+        if (!element || element.status !== "OK") {
+          throw new Error("Distance Matrix invalid response");
+        }
+
+        if (!cancelled) {
+          setDeliveryEta({
+            distanceText: element.distance?.text || "",
+            durationText: element.duration?.text || "",
+          });
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error("[useCheckout] ETA error:", err);
+          setDeliveryEtaError("Nao foi possivel calcular o tempo de entrega.");
+          setDeliveryEta(null);
+        }
+      } finally {
+        if (!cancelled) setDeliveryEtaLoading(false);
+      }
+    }, 500);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
+  }, [dados.endereco, dados.bairro, dados.retirada]);
 
   /* =========== CEP =========== */
 
@@ -598,6 +682,9 @@ export function useCheckout() {
     totalFinal,
     podeEnviar,
     enviando,
+    deliveryEta,
+    deliveryEtaLoading,
+    deliveryEtaError,
 
     // cart actions
     updateQuantity,

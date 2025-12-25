@@ -16,6 +16,9 @@ const DadosStep = ({
   onBuscarClientePorTelefone,
   tipoCliente,
   setTipoCliente,
+  deliveryEta,
+  deliveryEtaLoading,
+  deliveryEtaError,
 }) => {
   const taxaBairro = dados.retirada ? 0 : getTaxaPorBairroLocal(dados.bairro);
 
@@ -229,6 +232,29 @@ React.useEffect(() => {
                     </strong>{" "}
                     (calculada automaticamente pelo CEP).
                   </p>
+                )}
+                {!dados.retirada && (
+                  <>
+                    {deliveryEtaLoading && (
+                      <p className="mt-1 text-[11px] text-slate-500">
+                        Calculando tempo estimado de entrega...
+                      </p>
+                    )}
+                    {deliveryEta && !deliveryEtaLoading && (
+                      <p className="mt-1 text-[11px] text-slate-600">
+                        Tempo estimado:{" "}
+                        <strong>
+                          {deliveryEta.durationText}
+                        </strong>{" "}
+                        ({deliveryEta.distanceText})
+                      </p>
+                    )}
+                    {deliveryEtaError && !deliveryEtaLoading && (
+                      <p className="mt-1 text-[11px] text-amber-600">
+                        {deliveryEtaError}
+                      </p>
+                    )}
+                  </>
                 )}
                 {dados.retirada && (
                   <p className="mt-1 text-[11px] text-slate-600">

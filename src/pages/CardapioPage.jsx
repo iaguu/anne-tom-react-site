@@ -11,12 +11,17 @@
 // - Bloqueio por horário de funcionamento
 // ===============================================
 
-import React, { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useCart } from "../context/CartContext";
-import server from "../api/server";
-
-const MENU_CACHE_KEY = "anne_tom_menu_cache_v1";
+import { formatCurrencyBRL } from "../utils/menu";
+import { useMenuData } from "../hooks/useMenuData";
 
 // Horários oficiais (Tripadvisor):
 // Domingo: 19:00–23:00
@@ -32,13 +37,9 @@ const OPENING_HOURS = {
   6: { open: 18 * 60, close: 23 * 60 }, // Sábado
 };
 
-const OPENING_LABEL = "Terça a domingo das 19h às 23h (segunda fechado)";
+const FILTER_STORAGE_KEY = "anne_tom_cardapio_filters_v1";
 
-const formatCurrency = (value) =>
-  (Number(value) || 0).toLocaleString("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  });
+const OPENING_LABEL = "Terça a domingo das 19h às 23h (segunda fechado)";
 
 function isPizzariaOpen(now = new Date()) {
   const dow = now.getDay(); // 0-dom, 1-seg...
@@ -70,164 +71,45 @@ const prettyCategory = (c) => {
 
 // Converte badges "humanos" do JSON em códigos usados nas abas
 // e também tenta inferir por nome/categoria/ingredientes
-const normalizeBadgesFromItem = (item) => {
-  const rawBadges = Array.isArray(item.badges) ? item.badges : [];
-  const name = item.name || item.nome || "";
-  const category = item.category || item.categoria || "";
-  const ingredientes = Array.isArray(item.ingredientes)
-    ? item.ingredientes
-    : [];
-
-  const text = `${name} ${category} ${ingredientes.join(" ")}`.toLowerCase();
-
-  const badgesSet = new Set();
-
-  // --- mapeia badges que vierem escritos ---
-  rawBadges.forEach((b) => {
-    const v = String(b || "").toLowerCase();
-
-    if (v.includes("veggie") || v.includes("veg")) {
-      badgesSet.add("veggie");
-    } else if (
-      v.includes("picante") ||
-      v.includes("pimenta") ||
-      v.includes("hot") ||
-      v.includes("spicy")
-    ) {
-      badgesSet.add("hot");
-    } else if (v.includes("mais pedido") || v.includes("best")) {
-      badgesSet.add("best");
-    } else if (
-      v.includes("promo") ||
-      v.includes("combo") ||
-      v.includes("oferta")
-    ) {
-      badgesSet.add("promo");
-    } else if (v.includes("novo") || v.includes("lançamento")) {
-      badgesSet.add("new");
-    }
-  });
-
-  // --- heurísticas extras, caso o JSON não traga badge explícito ---
-
-  // Picante: se tiver pimenta no texto
-  if (text.includes("pimenta") || text.includes("apiment")) {
-    badgesSet.add("hot");
-  }
-
-  // Veggie: se não achar carne mas achar queijos/legumes
-  const hasMeat =
-    /calabresa|bacon|frango|carne|presunto|lombo|lingui[çc]a|peru|pepperoni|mignon|costela|salma[oã]|camar[aã]o|atum|anchov|peixe|pernil/i.test(
-      text
-    );
-
-  const hasVeggieHint =
-    /mussarela|muçarela|mozarela|queijo|ricota|gorgonzola|parmes[aã]o|catupiry|br[oó]colis|milho|palmito|escaraola|r[uú]cula|tomate|berinjela|abobrinha|cebola|piment[aã]o|champignon|azeitona|alcaparra|alho/i.test(
-      text
-    );
-
-  if (!hasMeat && hasVeggieHint) {
-    badgesSet.add("veggie");
-  }
-
-  // Mais pedido: sabores clássicos
-  const normName = (name || "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
-
-  if (
-    /musa|calabresa|portuguesa|frango com catupiry|anne & tom|anne e tom|mucuripe|4 queijos|quatro queijos|marguerita|margherita/.test(
-      normName
-    )
-  ) {
-    badgesSet.add("best");
-  }
-
-  return Array.from(badgesSet);
-};
-
-// Normaliza o JSON vindo da API (compatível com menu.txt)
-function normalizePizzasFromJson(json) {
-  let items = [];
-
-  if (!json) items = [];
-  else if (Array.isArray(json)) items = json;
-  else if (Array.isArray(json.products)) items = json.products;
-  else if (Array.isArray(json.items)) items = json.items;
-  else items = [];
-
-  const safeNumber = (v) => {
-    const n = Number(v);
-    return Number.isFinite(n) ? n : null;
-  };
-
-  return items
-    .filter((item) => {
-      // ❌ Não exibir pausados/inativos
-      if (item.active === false) return false;
-      if (item.isAvailable === false) return false;
-
-      // Só pizzas no cardápio principal
-      return item.type === "pizza";
-    })
-    .map((item) => {
-      const categoria = item.category || item.categoria || "Outros";
-      const categoriaUpper = String(categoria).toUpperCase();
-
-      let precoBroto = safeNumber(
-        item.priceBroto ?? item.preco_broto
-      );
-      let precoGrande = safeNumber(
-        item.priceGrande ?? item.preco_grande
-      );
-
-      // 🔥 Regra: BIG ESFIHAS não exibem "broto"
-      // (tratamos como tamanho único = "Grande")
-      if (categoriaUpper.includes("ESFIHA")) {
-        const unitPrice =
-          precoGrande != null ? precoGrande : precoBroto;
-        precoBroto = null;
-        precoGrande = unitPrice;
-      }
-
-      // Normaliza badges para os códigos usados nas abas
-      const badges = normalizeBadgesFromItem(item);
-
-      return {
-        id: String(item.id),
-        nome: item.name || item.nome || "",
-        categoria,
-        ingredientes: Array.isArray(item.ingredientes)
-          ? item.ingredientes
-          : [],
-        preco_broto: precoBroto,
-        preco_grande: precoGrande,
-        badges,
-        extras: Array.isArray(item.extras) ? item.extras : [],
-        sugestoes: Array.isArray(item.sugestoes)
-          ? item.sugestoes
-          : [],
-      };
-    });
-}
-
 const CardapioPage = () => {
   const { addItem, items, total } = useCart();
   const navigate = useNavigate();
 
+  const [searchParams, setSearchParams] = useSearchParams();
   // ---- Estados Gerais ----
   const [search, setSearch] = useState("");
   const [categoria, setCategoria] = useState("todas");
   const [badgeFilter, setBadgeFilter] = useState("all");
-  const [menuData, setMenuData] = useState(null);
-
-  const [loadingMenu, setLoadingMenu] = useState(false);
-  const [menuError, setMenuError] = useState("");
-  const [isUsingCachedMenu, setIsUsingCachedMenu] = useState(false);
-
+  const [showBackToTop, setShowBackToTop] = useState(false);
   // ---- Horário de funcionamento ----
   const [isOpenNow, setIsOpenNow] = useState(isPizzariaOpen());
+
+  const { pizzas, loadingMenu, menuError, isUsingCachedMenu } = useMenuData();
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage?.getItem(FILTER_STORAGE_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      if (saved?.categoria) setCategoria(saved.categoria);
+      if (saved?.badgeFilter) setBadgeFilter(saved.badgeFilter);
+      if (typeof saved?.search === "string") setSearch(saved.search);
+    } catch (_err) {
+      // ignore
+    }
+  }, []);
+
+  const targetPizzaId = searchParams.get("pizzaId");
+  const targetPizzaName = searchParams.get("pizza");
+
+  useEffect(() => {
+    try {
+      const payload = { categoria, badgeFilter, search };
+      window.localStorage?.setItem(FILTER_STORAGE_KEY, JSON.stringify(payload));
+    } catch (_err) {
+      // ignore
+    }
+  }, [categoria, badgeFilter, search]);
 
   useEffect(() => {
     const update = () => setIsOpenNow(isPizzariaOpen());
@@ -236,14 +118,29 @@ const CardapioPage = () => {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    const onScroll = () => {
+      setShowBackToTop(window.scrollY > 500);
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll);
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
   // ---- Modal ----
   const [selectedPizza, setSelectedPizza] = useState(null);
+  const cardRefs = useRef({});
+  const modalRef = useRef(null);
   const [tamanho, setTamanho] = useState("grande");
   const [quantidade, setQuantidade] = useState(1);
   const [isMeioMeio, setIsMeioMeio] = useState(false);
   const [meioId, setMeioId] = useState("");
   const [extrasSelecionados, setExtrasSelecionados] = useState([]);
   const [obsPizza, setObsPizza] = useState("");
+  const [focusExtras, setFocusExtras] = useState(false);
+  const extrasRef = useRef(null);
+
+  const [highlightedPizzaId, setHighlightedPizzaId] = useState(null);
 
   // helper: impede adicionar se estiver fechado
   const ensureOpenOrWarn = () => {
@@ -253,97 +150,6 @@ const CardapioPage = () => {
     );
     return false;
   };
-
-  // Carregar cardápio da API, com cache local
-  useEffect(() => {
-    let isMounted = true;
-
-const fetchMenu = async () => {
-  try {
-    setLoadingMenu(true);
-    setMenuError("");
-    setIsUsingCachedMenu(false);
-
-    const res = await server.fetchMenu()
-
-    if (!res.ok) {
-      throw new Error(`Falha no menu (HTTP ${res.status})`);
-    }
-
-    const contentType = res.headers.get("content-type") || "";
-
-    // se não for JSON, provavelmente voltou HTML de aviso
-    if (!contentType.includes("application/json")) {
-      const text = await res.text();
-      console.error(
-        "[Cardapio] Resposta não JSON da API (provavelmente HTML do Ngrok):",
-        text.slice(0, 400)
-      );
-      throw new Error("Resposta da API não está em JSON.");
-    }
-
-    const data = await res.json();
-
-    if (!isMounted) return;
-
-    setMenuData(data);
-    setIsUsingCachedMenu(false);
-
-    // salva no localStorage
-    try {
-      const payload = {
-        data,
-        savedAt: new Date().toISOString(),
-      };
-      window.localStorage?.setItem(
-        MENU_CACHE_KEY,
-        JSON.stringify(payload)
-      );
-    } catch (storageErr) {
-      console.warn(
-        "[Cardapio] Não foi possível salvar cache local:",
-        storageErr
-      );
-    }
-  } catch (err) {
-    console.error("[Cardapio] Erro ao buscar API de menu:", err);
-
-    if (!isMounted) return;
-
-    // tenta cache local
-    try {
-      const cachedRaw = window.localStorage?.getItem(MENU_CACHE_KEY);
-      if (cachedRaw) {
-        const cached = JSON.parse(cachedRaw);
-        setMenuData(cached.data);
-        setIsUsingCachedMenu(true);
-        setMenuError(
-          "Não foi possível conectar à API. Usando cardápio salvo neste dispositivo."
-        );
-      } else {
-        setMenuError("Erro ao carregar cardápio. Tente novamente.");
-      }
-    } catch (cacheErr) {
-      console.error("[Cardapio] Erro ao ler cache local:", cacheErr);
-      setMenuError("Erro ao carregar cardápio. Tente novamente.");
-    }
-  } finally {
-    if (isMounted) setLoadingMenu(false);
-  }
-};
-
-
-    fetchMenu();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  // Normaliza
-  const pizzas = useMemo(
-    () => normalizePizzasFromJson(menuData),
-    [menuData]
-  );
 
   // Categorias dinamicas
   const categorias = useMemo(() => {
@@ -417,7 +223,12 @@ const fetchMenu = async () => {
   // Total
   const precoTotal = (precoUnitario + extrasTotais) * quantidade;
 
-  const abrirModal = (pizza) => {
+  const abrirModal = (pizza, options = {}) => {
+    if (options.highlight) {
+      setHighlightedPizzaId(pizza.id);
+      window.setTimeout(() => setHighlightedPizzaId(null), 2000);
+    }
+    setFocusExtras(Boolean(options.focusExtras));
     setSelectedPizza(pizza);
     setQuantidade(1);
     setTamanho("grande");
@@ -427,7 +238,97 @@ const fetchMenu = async () => {
     setObsPizza("");
   };
 
-  const fecharModal = () => setSelectedPizza(null);
+  useEffect(() => {
+    if (!pizzas.length || selectedPizza) return;
+
+    let found = null;
+    if (targetPizzaId) {
+      found = pizzas.find((pizza) => pizza.id === targetPizzaId);
+    }
+
+    if (!found && targetPizzaName) {
+      const nameLower = targetPizzaName.toLowerCase();
+      found = pizzas.find((pizza) =>
+        String(pizza.nome || "").toLowerCase().includes(nameLower)
+      );
+    }
+
+    if (found) {
+      const node = cardRefs.current?.[found.id];
+      if (node && node.scrollIntoView) {
+        node.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+      abrirModal(found, { highlight: true });
+    }
+  }, [pizzas, targetPizzaId, targetPizzaName, selectedPizza]);
+
+  const fecharModal = useCallback(() => {
+    setSelectedPizza(null);
+    setFocusExtras(false);
+
+    if (searchParams.has("pizzaId") || searchParams.has("pizza")) {
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete("pizzaId");
+      nextParams.delete("pizza");
+      setSearchParams(nextParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
+  useEffect(() => {
+    if (!selectedPizza) return undefined;
+
+    const modalNode = modalRef.current;
+    const focusableSelector =
+      "a, button, input, textarea, select, [tabindex]:not([tabindex='-1'])";
+
+    const focusables = modalNode
+      ? Array.from(modalNode.querySelectorAll(focusableSelector)).filter(
+          (el) => !el.hasAttribute("disabled")
+        )
+      : [];
+
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+
+    if (first && first.focus) {
+      first.focus();
+    } else if (modalNode && modalNode.focus) {
+      modalNode.focus();
+    }
+
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        fecharModal();
+      }
+
+      if (event.key !== "Tab") return;
+
+      if (!first || !last) {
+        event.preventDefault();
+        return;
+      }
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [selectedPizza, fecharModal]);
+
+  useEffect(() => {
+    if (!selectedPizza || !focusExtras) return;
+    const node = extrasRef.current;
+    if (node && node.scrollIntoView) {
+      node.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [selectedPizza, focusExtras]);
 
   const handleAddToCart = () => {
     if (!selectedPizza) return;
@@ -467,9 +368,11 @@ const fetchMenu = async () => {
       <header className="border-b bg-white/90 backdrop-blur">
         <div className="max-w-6xl mx-auto h-16 px-4 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-3">
-            <div className="w-9 h-9 flex items-center justify-center bg-slate-900 text-white text-xs font-black rounded-full">
-              A&T
-            </div>
+            <img
+              src="/logopizzaria.png"
+              alt="Anne & Tom Pizzaria"
+              className="w-10 h-10 object-contain"
+            />
             <div>
               <p className="text-sm font-semibold">Pizzaria Anne & Tom</p>
               <p className="text-[11px] text-slate-500">Cardápio interno</p>
@@ -511,6 +414,7 @@ const fetchMenu = async () => {
           </div>
 
           {/* BUSCA + CATEGORIA */}
+          <div className="sticky top-20 z-10 bg-white/90 backdrop-blur border border-slate-200 rounded-2xl px-4 py-4">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1 flex items-center gap-2 bg-white border border-slate-200 rounded-full px-4 py-2.5">
               <span className="text-lg">🔍</span>
@@ -535,6 +439,7 @@ const fetchMenu = async () => {
               ))}
             </select>
           </div>
+        </div>
 
           {loadingMenu && (
             <p className="text-xs text-slate-500">Carregando...</p>
@@ -571,8 +476,11 @@ const fetchMenu = async () => {
             {pizzasFiltradas.map((pizza) => (
               <button
                 key={pizza.id}
+                ref={(node) => {
+                  if (node) cardRefs.current[pizza.id] = node;
+                }}
                 onClick={() => abrirModal(pizza)}
-                className="text-left bg-white border border-slate-200 rounded-2xl p-5 flex gap-4 hover:shadow-lg transition-shadow"
+                className={`text-left bg-white border rounded-2xl p-5 flex gap-4 hover:shadow-lg transition-shadow ${highlightedPizzaId === pizza.id ? "border-amber-400 ring-2 ring-amber-200" : "border-slate-200"}`}
               >
                 {/* imagem */}
                 <div className="w-24 h-24 rounded-full bg-gradient-to-br from-amber-200 via-orange-300 to-red-300 flex items-center justify-center text-3xl">
@@ -597,6 +505,18 @@ const fetchMenu = async () => {
 
                     {/* BADGES */}
                     <div className="flex gap-1 flex-wrap mt-2">
+                      {pizza.extras?.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            abrirModal(pizza, { focusExtras: true });
+                          }}
+                          className="px-2 py-0.5 text-[11px] bg-slate-100 text-slate-600 rounded-full"
+                        >
+                          Adicionais
+                        </button>
+                      )}
                       {pizza.badges?.includes("best") && (
                         <span className="px-2 py-0.5 text-[11px] bg-amber-100 text-amber-700 rounded-full">
                           ⭐ Mais pedido
@@ -631,7 +551,7 @@ const fetchMenu = async () => {
                       <span className="mr-3 block md:inline">
                         Broto:{" "}
                         <span className="font-semibold">
-                          {formatCurrency(pizza.preco_broto)}
+                          {formatCurrencyBRL(pizza.preco_broto)}
                         </span>
                       </span>
                     )}
@@ -639,7 +559,7 @@ const fetchMenu = async () => {
                       <span>
                         Grande:{" "}
                         <span className="font-semibold">
-                          {formatCurrency(pizza.preco_grande)}
+                          {formatCurrencyBRL(pizza.preco_grande)}
                         </span>
                       </span>
                     )}
@@ -656,12 +576,28 @@ const fetchMenu = async () => {
           </div>
         </section>
       </main>
+      {showBackToTop && (
+        <button
+          type="button"
+          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          className="fixed bottom-6 right-6 z-30 rounded-full bg-slate-900 text-white text-xs font-semibold px-4 py-2 shadow-lg hover:bg-slate-800"
+        >
+          Voltar ao topo
+        </button>
+      )}
+
 
       {/* MODAL */}
       {selectedPizza && (
         <div className="fixed inset-0 z-40 bg-black/40 flex items-center justify-center p-4 md:p-6">
           <div className="w-full max-w-xl max-h-[90vh]">
-            <div className="bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-cardapio-modal">
+            <div
+              ref={modalRef}
+              role="dialog"
+              aria-modal="true"
+              tabIndex={-1}
+              className="bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-cardapio-modal"
+            >
               {/* topo (imagem) */}
               <div className="h-40 bg-slate-100 flex items-center justify-center shrink-0">
                 <div className="w-32 h-32 bg-gradient-to-br from-amber-200 via-orange-300 to-red-300 rounded-full flex items-center justify-center text-4xl">
@@ -696,7 +632,7 @@ const fetchMenu = async () => {
                         }`}
                       >
                         Broto ·{" "}
-                        {formatCurrency(selectedPizza.preco_broto)}
+                        {formatCurrencyBRL(selectedPizza.preco_broto)}
                       </button>
                     )}
 
@@ -710,7 +646,7 @@ const fetchMenu = async () => {
                         }`}
                       >
                         Grande ·{" "}
-                        {formatCurrency(selectedPizza.preco_grande)}
+                        {formatCurrencyBRL(selectedPizza.preco_grande)}
                       </button>
                     )}
                   </div>
@@ -757,7 +693,7 @@ const fetchMenu = async () => {
 
                 {/* EXTRAS */}
                 {selectedPizza.extras?.length > 0 && (
-                  <div className="space-y-2">
+                  <div ref={extrasRef} className="space-y-2">
                     <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">
                       Adicionais
                     </p>
@@ -783,7 +719,7 @@ const fetchMenu = async () => {
                         </div>
                         <span>
                           +{" "}
-                          {formatCurrency(
+                          {formatCurrencyBRL(
                             ext.preco ?? ext.price ?? 0
                           )}
                         </span>
@@ -819,7 +755,7 @@ const fetchMenu = async () => {
                       Total
                     </p>
                     <p className="text-lg font-semibold">
-                      {formatCurrency(precoTotal)}
+                      {formatCurrencyBRL(precoTotal)}
                     </p>
                   </div>
                 </div>
@@ -876,7 +812,7 @@ const fetchMenu = async () => {
                               {s.nome || s.name}
                             </span>
                             <span className="font-semibold">
-                              {formatCurrency(precoSugestao)}
+                              {formatCurrencyBRL(precoSugestao)}
                             </span>
                           </button>
                         );
@@ -893,7 +829,7 @@ const fetchMenu = async () => {
                     disabled={!isOpenNow}
                   >
                     {isOpenNow
-                      ? `Adicionar ao carrinho · ${formatCurrency(
+                      ? `Adicionar ao carrinho · ${formatCurrencyBRL(
                           precoTotal
                         )}`
                       : "Pizzaria fechada no momento"}
@@ -938,7 +874,7 @@ const fetchMenu = async () => {
                 <span>Ver carrinho e finalizar pedido</span>
               </div>
               <div className="flex items-center gap-2 font-semibold">
-                <span>{formatCurrency(total)}</span>
+                <span>{formatCurrencyBRL(total)}</span>
                 <span className="text-xs md:text-sm opacity-80">
                   Ir para checkout →
                 </span>
