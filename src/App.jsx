@@ -16,7 +16,6 @@ import AllergensPage from "./pages/AllergensPage";
 import LoyaltyPage from "./pages/LoyaltyPage";
 import CareersPage from "./pages/CareersPage";
 import GalleryPage from "./pages/GalleryPage";
-import MobileQuickActions from "./components/layout/MobileQuickActions";
 
 const AppContent = () => {
   const location = useLocation();
@@ -48,7 +47,6 @@ const AppContent = () => {
 const App = () => (
   <CartProvider>
     <AppContent />
-    <MobileQuickActions />
   </CartProvider>
 );
 

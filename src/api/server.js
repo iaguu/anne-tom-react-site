@@ -2,6 +2,10 @@ import axios from 'axios';
 
 const apiKey = process.env.REACT_APP_AT_API_KEY;
 const publicToken = process.env.REACT_APP_PUBLIC_API_TOKEN;
+const runtimeConfig =
+  typeof window !== "undefined"
+    ? window.__ANNE_TOM_CONFIG__ || window.__APP_CONFIG__
+    : undefined;
 
 const toResponse = (response) => ({
   ok: response.status >= 200 && response.status < 300,
@@ -45,14 +49,16 @@ export const serverInstance = {
     instance: axios.create({
       timeout: 15000,
       baseURL:
-        process.env.REACT_APP_AT_API_BASE_URL ||
-        "https://portalled-keshia-intolerable.ngrok-free.dev",
+        process.env.REACT_APP_AT_API_BASE_URL || "https://api.annetom.com",
       validateStatus: () => true,
       headers: {
         Accept: "application/json",
         "ngrok-skip-browser-warning": "true",
         ...(apiKey ? { "x-api-key": apiKey } : {}),
         ...(publicToken ? { "x-api-key": publicToken } : {}),
+        ...(!apiKey && !publicToken && runtimeConfig?.apiKey
+          ? { Authorization: `Bearer ${runtimeConfig.apiKey}` }
+          : {}),
       },
     }),
   },

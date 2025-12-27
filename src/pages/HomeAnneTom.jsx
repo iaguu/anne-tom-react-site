@@ -8,8 +8,11 @@ import { formatCurrencyBRL } from "../utils/menu";
 import { HOME_MENU_OVERRIDES, matchOverrides } from "../data/menuOverrides";
 
 import { useAppAccessInfo } from "../hooks/useAppAccess";
+import RetryBanner from "../components/ui/RetryBanner";
 
 import SiteFooter from "../components/layout/SiteFooter";
+
+const PIZZA_IMAGE_SRC = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 900 900'><rect fill='%23FAF6F0' width='900' height='900' rx='120'/><circle cx='450' cy='450' r='380' fill='%23f5c16c' stroke='%23a63f1b' stroke-width='50'/><circle cx='450' cy='450' r='270' fill='%23f9dd93'/><circle cx='450' cy='450' r='220' fill='%23f5c16c'/><circle cx='450' cy='450' r='190' fill='%238b2f0b'/><g stroke='%23f4b042' stroke-width='35'><line x1='450' y1='110' x2='450' y2='790'/><line x1='110' y1='450' x2='790' y2='450'/><line x1='190' y1='190' x2='710' y2='710'/><line x1='710' y1='190' x2='190' y2='710'/></g><g fill='%23f4b042'><circle cx='320' cy='340' r='35'/><circle cx='580' cy='300' r='30'/><circle cx='430' cy='560' r='32'/><circle cx='360' cy='520' r='26'/><circle cx='500' cy='420' r='28'/><circle cx='610' cy='520' r='24'/></g></svg>`;
 
 
 
@@ -35,7 +38,7 @@ const HomeAnneTom = () => {
 
   const [imageLoaded, setImageLoaded] = useState(false);
 
-  const { pizzas, loadingMenu, menuError } = useMenuData();
+  const { pizzas, loadingMenu, menuError, retry } = useMenuData();
   const { isAppWebView, isMobileBrowser, initialized } = useAppAccessInfo();
   const navigate = useNavigate();
 
@@ -109,9 +112,11 @@ const HomeAnneTom = () => {
 
 
 
-        <main className="pt-20">
+        <main className="pt-16 sm:pt-18">
 
         <Hero imageLoaded={imageLoaded} setImageLoaded={setImageLoaded} highlights={heroHighlights} />
+
+        {menuError && <RetryBanner message={menuError} onRetry={retry} />}
 
         {showDownloadAppSection && <DownloadAppSection />}
 
@@ -149,7 +154,7 @@ const HomeAnneTom = () => {
 
                 title="Massa levíssima"
 
-                text="Fermentação lenta, massa descansada por 48h e borda crocante — mata a fome sem pesar."
+                text="Fermentação de 48h, borda crocante e miolo arejado para noites sem peso."
 
               />
 
@@ -159,7 +164,7 @@ const HomeAnneTom = () => {
 
                 title="Recheio generoso"
 
-                text="Queijos selecionados, ingredientes frescos e combinações autorais que só tem aqui."
+                text="Queijos premium, ingredientes frescos e receitas autorais com carinho de bairro."
 
               />
 
@@ -169,7 +174,7 @@ const HomeAnneTom = () => {
 
                 title="Entrega caprichada"
 
-                text="Entrega pensada pra chegar quentinha e inteira, do forno até o seu sofá."
+                text="Pedidos embalados com cuidado para chegar quentinhos e prontos para o seu sofá."
 
               />
 
@@ -365,7 +370,7 @@ const Header = ({ scrolled }) => {
         </Link>
 
         {/* Menu Desktop */}
-        <nav className="hidden md:flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-[11px] font-medium">
+        <nav className="hidden md:flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-[12px] font-medium">
           <a href="#destaques" className={pillClass(isHashActive("#destaques"))}>
             Destaques
           </a>
@@ -638,13 +643,13 @@ const Hero = ({ imageLoaded, setImageLoaded, highlights = [] }) => (
 
 
 
-        <div className="flex flex-wrap gap-3 pt-2">
+        <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:flex-wrap">
 
           <Link
 
             to="/cardapio"
 
-            className="inline-flex items-center justify-center px-7 py-3.5 rounded-full bg-gradient-to-r from-amber-500 to-rose-500 text-white text-sm md:text-base font-semibold shadow-sm hover:brightness-110 transition"
+            className="inline-flex items-center justify-center w-full sm:w-auto px-7 py-3.5 rounded-full bg-gradient-to-r from-amber-500 to-rose-500 text-white text-sm md:text-base font-semibold shadow-sm hover:brightness-110 transition"
 
           >
 
@@ -662,7 +667,7 @@ const Hero = ({ imageLoaded, setImageLoaded, highlights = [] }) => (
 
             rel="noreferrer"
 
-            className="inline-flex items-center justify-center px-6 py-3 rounded-full border border-emerald-200 bg-white text-sm md:text-base text-emerald-700 hover:bg-emerald-50 transition"
+            className="inline-flex items-center justify-center w-full sm:w-auto px-6 py-3 rounded-full border border-emerald-200 bg-white text-sm md:text-base text-emerald-700 hover:bg-emerald-50 transition"
 
           >
 
@@ -688,32 +693,20 @@ const Hero = ({ imageLoaded, setImageLoaded, highlights = [] }) => (
 
           </div>
 
-        {highlights.length > 0 && (
-          <div className="flex flex-wrap gap-2 pt-3">
-            {highlights.map((item) => (
-              <span
-                key={item}
-                className="text-[11px] px-3 py-1 rounded-full bg-white border border-slate-200 text-slate-600"
-              >
-                {item}
-              </span>
-            ))}
+        <div className="flex justify-center mt-6">
+          <div className="relative w-full max-w-3xl rounded-3xl border border-slate-200 bg-gradient-to-r from-white via-slate-50 to-slate-100 px-6 py-6 text-center shadow-lg">
+            <div className="absolute -left-6 top-1/2 -translate-y-1/2 hidden rounded-full border border-amber-200 bg-white/80 p-4 shadow-sm md:block">
+              <span className="text-amber-400 text-xl">★</span>
+            </div>
+            <p className="text-[13px] md:text-[14px] font-semibold uppercase tracking-[0.3em] text-slate-900">
+              Mais de 15 mil pedidos entregues na Zona Norte
+            </p>
+            <p className="mt-2 text-[14px] leading-relaxed text-slate-600">
+              Desde 2019, destacando-se como uma das pizzarias mais elogiadas com
+              massa leve, ingredientes frescos e atendimento genuíno de bairro.
+            </p>
           </div>
-        )}
-
-          <p className="text-[12px] md:text-sm text-slate-500">
-
-            Mais de{" "}
-
-            <span className="font-semibold text-slate-800">
-
-              1.500 pedidos entregues
-
-            </span>{" "}
-
-            em Santana e região.
-
-          </p>
+        </div>
 
         </div>
 
@@ -737,7 +730,7 @@ const Hero = ({ imageLoaded, setImageLoaded, highlights = [] }) => (
 
           <img
 
-            src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQkSMiKaN6KCRR0PVCV-zjtIYToLPuFEN1_Gw&s"
+            src={PIZZA_IMAGE_SRC}
 
             alt="Pizza artesanal Anne & Tom"
 
@@ -748,6 +741,10 @@ const Hero = ({ imageLoaded, setImageLoaded, highlights = [] }) => (
             }`}
 
             onLoad={() => setImageLoaded(true)}
+
+            loading="lazy"
+
+            decoding="async"
 
           />
 
@@ -891,12 +888,14 @@ const BestSellerCard = ({ item, onSelect }) => (
     onClick={() => onSelect?.(item)}
     className="bg-white rounded-2xl border border-slate-100 shadow-sm px-4 py-5 flex flex-col gap-2 hover:shadow-md hover:-translate-y-[2px] transition transform text-left"
   >
-    <div className="flex items-center justify-between mb-1">
-      <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-amber-50 text-[11px] font-medium text-amber-700">
-        {item.badge}
-      </span>
-      <span className="text-lg font-bold text-amber-600">{item.icon}</span>
-    </div>
+      <div className="flex items-center justify-between mb-1">
+        <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-amber-50 text-[11px] font-medium text-amber-700">
+          {item.badge}
+        </span>
+        <span className="text-lg font-bold text-amber-600" aria-hidden="true">
+          {item.icon}
+        </span>
+      </div>
     <p className="text-sm md:text-base font-semibold text-slate-900">
       {item.name}
     </p>
@@ -1299,7 +1298,7 @@ const SectionTitle = ({ eyebrow, title, subtitle }) => (
 
 const FeatureCard = ({ icon, title, text }) => (
 
-  <div className="bg-white rounded-2xl border border-slate-100 shadow-sm px-5 py-6 flex flex-col gap-2 hover:shadow-md hover:-translate-y-[1px] transition transform">
+  <div className="bg-white rounded-2xl border border-slate-100 shadow-sm px-5 py-6 flex flex-col gap-3 items-center text-center hover:shadow-md hover:-translate-y-[1px] transition transform">
 
     <div className="text-3xl md:text-4xl">{icon}</div>
 
@@ -1309,7 +1308,7 @@ const FeatureCard = ({ icon, title, text }) => (
 
     </p>
 
-    <p className="text-xs md:text-sm text-slate-500 leading-relaxed">
+    <p className="text-xs md:text-sm text-slate-500 leading-relaxed max-w-[260px]">
 
       {text}
 
@@ -1507,6 +1506,16 @@ const styles = `
 
     to   { opacity: 1; transform: scale(1); }
 
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-page-in,
+    .animate-fade-up,
+    .animate-fade-in-image {
+      animation-duration: 0.01s !important;
+      animation-iteration-count: 1 !important;
+      animation-fill-mode: both !important;
+    }
   }
 
 `;

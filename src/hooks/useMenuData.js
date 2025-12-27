@@ -12,11 +12,17 @@ const readCache = () => {
   }
 };
 
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
 export const useMenuData = () => {
   const [menuData, setMenuData] = useState(null);
   const [loadingMenu, setLoadingMenu] = useState(false);
   const [menuError, setMenuError] = useState("");
   const [isUsingCachedMenu, setIsUsingCachedMenu] = useState(false);
+  const [cacheStale, setCacheStale] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
+
+  const retry = () => setRetryKey((prev) => prev + 1);
 
   useEffect(() => {
     let isMounted = true;
@@ -45,6 +51,7 @@ export const useMenuData = () => {
 
         setMenuData(data);
         setIsUsingCachedMenu(false);
+        setCacheStale(false);
 
         try {
           const payload = { data, savedAt: new Date().toISOString() };
@@ -58,10 +65,17 @@ export const useMenuData = () => {
 
         const cached = readCache();
         if (cached?.data) {
+          const savedAt = cached.savedAt
+            ? new Date(cached.savedAt).getTime()
+            : 0;
+          const isStale = savedAt === 0 || Date.now() - savedAt > CACHE_TTL_MS;
           setMenuData(cached.data);
           setIsUsingCachedMenu(true);
+          setCacheStale(isStale);
           setMenuError(
-            "Nao foi possivel conectar a API. Usando cardapio salvo neste dispositivo."
+            isStale
+              ? `Nao foi possivel conectar a API. Usando cardapio salvo (${savedAt ? new Date(savedAt).toLocaleString() : "desatualizado"}).`
+              : "Nao foi possivel conectar a API. Usando cardapio salvo neste dispositivo."
           );
         } else {
           setMenuError("Erro ao carregar cardapio. Tente novamente.");
@@ -75,7 +89,7 @@ export const useMenuData = () => {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [retryKey]);
 
   const pizzas = useMemo(() => normalizePizzasFromJson(menuData), [menuData]);
 
@@ -85,5 +99,7 @@ export const useMenuData = () => {
     loadingMenu,
     menuError,
     isUsingCachedMenu,
+    cacheStale,
+    retry,
   };
 };

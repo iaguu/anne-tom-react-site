@@ -22,6 +22,8 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useCart } from "../context/CartContext";
 import { formatCurrencyBRL } from "../utils/menu";
 import { useMenuData } from "../hooks/useMenuData";
+import RetryBanner from "../components/ui/RetryBanner";
+import { useAppAccessInfo } from "../hooks/useAppAccess";
 
 // Horários oficiais (Tripadvisor):
 // Domingo: 19:00–23:00
@@ -84,7 +86,11 @@ const CardapioPage = () => {
   // ---- Horário de funcionamento ----
   const [isOpenNow, setIsOpenNow] = useState(isPizzariaOpen());
 
-  const { pizzas, loadingMenu, menuError, isUsingCachedMenu } = useMenuData();
+  const { isAppWebView, initialized: appInfoReady } = useAppAccessInfo();
+  const [showAppToast, setShowAppToast] = useState(false);
+
+  const { pizzas, loadingMenu, menuError, isUsingCachedMenu, retry } =
+    useMenuData();
 
   useEffect(() => {
     try {
@@ -127,6 +133,13 @@ const CardapioPage = () => {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  useEffect(() => {
+    if (!appInfoReady || !isAppWebView) return undefined;
+    setShowAppToast(true);
+    const timer = window.setTimeout(() => setShowAppToast(false), 3500);
+    return () => window.clearTimeout(timer);
+  }, [appInfoReady, isAppWebView]);
+
   // ---- Modal ----
   const [selectedPizza, setSelectedPizza] = useState(null);
   const cardRefs = useRef({});
@@ -138,6 +151,7 @@ const CardapioPage = () => {
   const [extrasSelecionados, setExtrasSelecionados] = useState([]);
   const [obsPizza, setObsPizza] = useState("");
   const [focusExtras, setFocusExtras] = useState(false);
+  const [extrasOpen, setExtrasOpen] = useState(false);
   const extrasRef = useRef(null);
 
   const [highlightedPizzaId, setHighlightedPizzaId] = useState(null);
@@ -228,7 +242,9 @@ const CardapioPage = () => {
       setHighlightedPizzaId(pizza.id);
       window.setTimeout(() => setHighlightedPizzaId(null), 2000);
     }
-    setFocusExtras(Boolean(options.focusExtras));
+    const wantsExtras = Boolean(options.focusExtras);
+    setFocusExtras(wantsExtras);
+    setExtrasOpen(wantsExtras);
     setSelectedPizza(pizza);
     setQuantidade(1);
     setTamanho("grande");
@@ -265,6 +281,7 @@ const CardapioPage = () => {
   const fecharModal = useCallback(() => {
     setSelectedPizza(null);
     setFocusExtras(false);
+    setExtrasOpen(false);
 
     if (searchParams.has("pizzaId") || searchParams.has("pizza")) {
       const nextParams = new URLSearchParams(searchParams);
@@ -323,12 +340,12 @@ const CardapioPage = () => {
   }, [selectedPizza, fecharModal]);
 
   useEffect(() => {
-    if (!selectedPizza || !focusExtras) return;
+    if (!selectedPizza || !focusExtras || !extrasOpen) return;
     const node = extrasRef.current;
     if (node && node.scrollIntoView) {
       node.scrollIntoView({ behavior: "smooth", block: "start" });
     }
-  }, [selectedPizza, focusExtras]);
+  }, [selectedPizza, focusExtras, extrasOpen]);
 
   const handleAddToCart = () => {
     if (!selectedPizza) return;
@@ -388,8 +405,17 @@ const CardapioPage = () => {
         </div>
       </header>
 
+      {showAppToast && (
+        <div className="fixed left-1/2 top-24 z-40 w-[min(95%,360px)] -translate-x-1/2 rounded-2xl bg-slate-900 px-4 py-2 text-center text-xs font-semibold text-white shadow-lg">
+          Você está no cardápio interno da Anne &amp; Tom.
+        </div>
+      )}
+
       {/* CONTEÚDO */}
       <main className="max-w-6xl mx-auto px-4 py-8 space-y-6">
+
+        {menuError && <RetryBanner message={menuError} onRetry={retry} />}
+
         {/* Título */}
         <section className="space-y-3">
           <h1 className="text-3xl md:text-4xl font-black">
@@ -414,11 +440,18 @@ const CardapioPage = () => {
           </div>
 
           {/* BUSCA + CATEGORIA */}
-          <div className="sticky top-20 z-10 bg-white/90 backdrop-blur border border-slate-200 rounded-2xl px-4 py-4">
+          <div
+            className="sticky top-20 z-10 bg-white/90 backdrop-blur border border-slate-200 rounded-2xl px-4 py-4"
+            style={{ top: "calc(72px + env(safe-area-inset-top, 0px))" }}
+          >
+          <label htmlFor="cardapio-search" className="sr-only">
+            Buscar cardápio
+          </label>
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1 flex items-center gap-2 bg-white border border-slate-200 rounded-full px-4 py-2.5">
               <span className="text-lg">🔍</span>
               <input
+                id="cardapio-search"
                 type="text"
                 className="flex-1 bg-transparent outline-none text-sm md:text-base"
                 placeholder="Buscar por nome ou ingrediente..."
@@ -445,7 +478,13 @@ const CardapioPage = () => {
             <p className="text-xs text-slate-500">Carregando...</p>
           )}
           {menuError && (
-            <p className="text-xs text-amber-700">{menuError}</p>
+            <p
+              className="text-xs text-amber-700"
+              role="status"
+              aria-live="polite"
+            >
+              {menuError}
+            </p>
           )}
         </section>
 
@@ -461,7 +500,7 @@ const CardapioPage = () => {
               <button
                 key={tab.key}
                 onClick={() => setBadgeFilter(tab.key)}
-                className={`px-3 py-1.5 rounded-full text-xs md:text-sm border transition-colors ${
+                className={`px-3 py-2.5 min-h-[44px] rounded-full text-xs md:text-sm border transition-colors ${
                   badgeFilter === tab.key
                     ? "bg-slate-900 text-white border-slate-900"
                     : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
@@ -473,19 +512,32 @@ const CardapioPage = () => {
           </div>
 
           <div className="grid md:grid-cols-2 gap-5">
-            {pizzasFiltradas.map((pizza) => (
-              <button
-                key={pizza.id}
-                ref={(node) => {
-                  if (node) cardRefs.current[pizza.id] = node;
-                }}
-                onClick={() => abrirModal(pizza)}
-                className={`text-left bg-white border rounded-2xl p-5 flex gap-4 hover:shadow-lg transition-shadow ${highlightedPizzaId === pizza.id ? "border-amber-400 ring-2 ring-amber-200" : "border-slate-200"}`}
-              >
-                {/* imagem */}
-                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-amber-200 via-orange-300 to-red-300 flex items-center justify-center text-3xl">
-                  🍕
-                </div>
+            {pizzasFiltradas.map((pizza) => {
+              const priceParts = [];
+              if (pizza.preco_grande != null) {
+                priceParts.push(`Grande ${formatCurrencyBRL(pizza.preco_grande)}`);
+              }
+              if (pizza.preco_broto != null) {
+                priceParts.push(`Broto ${formatCurrencyBRL(pizza.preco_broto)}`);
+              }
+              const ariaLabel = `${pizza.nome} ${
+                priceParts.length ? `– ${priceParts.join(" / ")}` : ""
+              } | ${prettyCategory(pizza.categoria)}`;
+
+              return (
+                <button
+                  key={pizza.id}
+                  ref={(node) => {
+                    if (node) cardRefs.current[pizza.id] = node;
+                  }}
+                  onClick={() => abrirModal(pizza)}
+                  aria-label={ariaLabel}
+                  className={`text-left bg-white border rounded-2xl p-5 flex gap-4 hover:shadow-lg transition-shadow ${highlightedPizzaId === pizza.id ? "border-amber-400 ring-2 ring-amber-200" : "border-slate-200"}`}
+                >
+                  {/* imagem */}
+                  <div className="w-24 h-24 rounded-full bg-gradient-to-br from-amber-200 via-orange-300 to-red-300 flex items-center justify-center text-3xl">
+                  <span aria-hidden="true">🍕</span>
+                  </div>
 
                 {/* Info */}
                 <div className="flex-1 flex flex-col justify-between">
@@ -564,9 +616,10 @@ const CardapioPage = () => {
                       </span>
                     )}
                   </div>
-                </div>
-              </button>
-            ))}
+                  </div>
+                </button>
+              );
+            })}
 
             {!loadingMenu && pizzasFiltradas.length === 0 && (
               <p className="text-sm text-slate-500">
@@ -693,38 +746,53 @@ const CardapioPage = () => {
 
                 {/* EXTRAS */}
                 {selectedPizza.extras?.length > 0 && (
-                  <div ref={extrasRef} className="space-y-2">
-                    <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">
-                      Adicionais
-                    </p>
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      aria-expanded={extrasOpen}
+                      onClick={() => {
+                        setExtrasOpen((prev) => !prev);
+                        setFocusExtras(true);
+                      }}
+                      className="text-xs font-medium text-slate-600 uppercase tracking-wide underline-offset-4 focus-visible:underline"
+                    >
+                      {extrasOpen ? "Ocultar adicionais" : "Mostrar adicionais"}
+                    </button>
+                    {extrasOpen && (
+                      <div ref={extrasRef} className="space-y-2">
+                        <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">
+                          Adicionais
+                        </p>
 
-                    {selectedPizza.extras.map((ext) => (
-                      <label
-                        key={ext.id}
-                        className="flex items-center justify-between px-3 py-2 border border-slate-300 bg-white rounded-xl text-sm"
-                      >
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={extrasSelecionados.includes(ext.id)}
-                            onChange={() => {
-                              setExtrasSelecionados((prev) =>
-                                prev.includes(ext.id)
-                                  ? prev.filter((x) => x !== ext.id)
-                                  : [...prev, ext.id]
-                              );
-                            }}
-                          />
-                          <span>{ext.nome}</span>
-                        </div>
-                        <span>
-                          +{" "}
-                          {formatCurrencyBRL(
-                            ext.preco ?? ext.price ?? 0
-                          )}
-                        </span>
-                      </label>
-                    ))}
+                        {selectedPizza.extras.map((ext) => (
+                          <label
+                            key={ext.id}
+                            className="flex items-center justify-between px-3 py-2 border border-slate-300 bg-white rounded-xl text-sm"
+                          >
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={extrasSelecionados.includes(ext.id)}
+                                onChange={() => {
+                                  setExtrasSelecionados((prev) =>
+                                    prev.includes(ext.id)
+                                      ? prev.filter((x) => x !== ext.id)
+                                      : [...prev, ext.id]
+                                  );
+                                }}
+                              />
+                              <span>{ext.nome}</span>
+                            </div>
+                            <span>
+                              +{" "}
+                              {formatCurrencyBRL(
+                                ext.preco ?? ext.price ?? 0
+                              )}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
 
