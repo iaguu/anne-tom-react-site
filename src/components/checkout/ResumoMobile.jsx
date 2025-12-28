@@ -9,7 +9,7 @@ const ResumoMobile = ({ items, totalFinal }) => {
     <>
       <button
         type="button"
-        className="lg:hidden fixed bottom-4 right-4 z-40 px-4 py-2 rounded-full bg-slate-900 text-white text-xs font-semibold shadow-lg"
+        className="premium-button lg:hidden fixed bottom-4 right-4 z-40 px-4 py-2 text-xs shadow-lg"
         onClick={() => setAberto(true)}
       >
         Ver resumo (R$ {totalFinal.toFixed(2).replace(".", ",")})
@@ -17,7 +17,7 @@ const ResumoMobile = ({ items, totalFinal }) => {
 
       {aberto && (
         <div className="lg:hidden fixed inset-0 z-40 bg-black/40 flex items-end">
-          <div className="w-full bg-white rounded-t-3xl p-4 space-y-3">
+          <div className="premium-card w-full bg-white rounded-t-3xl p-4 space-y-3">
             <div className="flex justify-between items-center">
               <p className="text-sm font-semibold">Resumo do pedido</p>
               <button
@@ -40,8 +40,17 @@ const ResumoMobile = ({ items, totalFinal }) => {
                       </p>
                       <p className="text-[11px] text-slate-500">
                         {item.tamanho}
-                        {item.meio && ` · meio a meio com ${item.meio}`}
                       </p>
+                      {Array.isArray(item.sabores) && item.sabores.length > 1 && (
+                        <p className="text-[11px] text-slate-500">
+                          Sabores: {item.sabores.join(" / ")}
+                        </p>
+                      )}
+                      {!item.sabores && item.meio && (
+                        <p className="text-[11px] text-slate-500">
+                          Meio a meio com {item.meio}
+                        </p>
+                      )}
                       {Array.isArray(item.extras) &&
                         item.extras.length > 0 && (
                           <p className="text-[11px] text-slate-500">

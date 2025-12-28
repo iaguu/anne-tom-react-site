@@ -12,7 +12,7 @@ const RevisaoStep = ({
     <div className="space-y-6">
       <h2 className="font-semibold text-lg">Revise seus dados</h2>
 
-      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm space-y-3">
+      <div className="premium-card rounded-2xl border border-slate-200 bg-white p-4 text-sm space-y-3">
         <div>
           <h3 className="text-xs font-semibold text-slate-500 mb-1">
             Cliente

@@ -2,9 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import server from "../api/server";
-
-const formatCurrencyBRL = (value) =>
-  Number(value || 0).toFixed(2).replace(".", ",");
+import { formatCurrencyBRL } from "../utils/menu";
 
 // -----------------------------
 // Helpers de status / ETA
@@ -86,6 +84,9 @@ const OrderConfirmationPage = () => {
   const [trackingStatus, setTrackingStatus] = useState("open");
   const [trackingLoading, setTrackingLoading] = useState(false);
   const [trackingError, setTrackingError] = useState(null);
+  const [confirmingDelivery, setConfirmingDelivery] = useState(false);
+  const [confirmError, setConfirmError] = useState("");
+  const [deliveryConfirmed, setDeliveryConfirmed] = useState(false);
 
   // -------------------------------------------------------------------
   // 1) Resolver resumo + trackingId (URL + state + localStorage)
@@ -144,6 +145,12 @@ const OrderConfirmationPage = () => {
     const resolved = fromUrl || fromStateTracking || fromSummary || null;
 
     setTrackingId(resolved);
+    setDeliveryConfirmed(
+      resolved
+        ? window.localStorage?.getItem(`order-delivery-confirmed-${resolved}`) ===
+            "true"
+        : false
+    );
 
     console.log("[OrderConfirmation] trackingId resolvido:", {
       fromUrl,
@@ -278,7 +285,9 @@ const OrderConfirmationPage = () => {
           "open";
 
         setTrackingData(order);
-        setTrackingStatus(normalizeStatus(rawStatus || "open"));
+        if (!deliveryConfirmed) {
+          setTrackingStatus(normalizeStatus(rawStatus || "open"));
+        }
       } catch (err) {
         if (cancelled) return;
         console.error("[OrderConfirmation] erro ao buscar status:", err);
@@ -297,7 +306,7 @@ const OrderConfirmationPage = () => {
       cancelled = true;
       if (intervalId) window.clearInterval(intervalId);
     };
-  }, [trackingId]);
+  }, [trackingId, deliveryConfirmed]);
 
   // -------------------------------------------------------------------
   // UI (layout original, sem mudanças visuais drásticas)
@@ -477,6 +486,48 @@ const OrderConfirmationPage = () => {
                   })}
                 </div>
               </div>
+
+              {trackingId &&
+                trackingStatus !== "done" &&
+                trackingStatus !== "cancelled" &&
+                !deliveryConfirmed && (
+                  <div className="mt-3 flex flex-col gap-2">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!trackingId) return;
+                        setConfirmError("");
+                        setConfirmingDelivery(true);
+                        const result = await server.confirmDelivery(trackingId);
+                        setConfirmingDelivery(false);
+                        if (!result?.ok) {
+                          setConfirmError(
+                            "Nao foi possivel confirmar a entrega agora."
+                          );
+                          return;
+                        }
+                        window.localStorage?.setItem(
+                          `order-delivery-confirmed-${trackingId}`,
+                          "true"
+                        );
+                        setDeliveryConfirmed(true);
+                        setTrackingStatus("done");
+                      }}
+                      disabled={confirmingDelivery}
+                      className="inline-flex items-center justify-center gap-2 rounded-full bg-emerald-500 px-4 py-2 text-[11px] font-semibold text-white shadow-sm transition hover:bg-emerald-400 disabled:opacity-60"
+                    >
+                      {confirmingDelivery ? "Confirmando..." : "Confirmar entrega"}
+                    </button>
+                    {confirmError && (
+                      <p className="text-xs text-amber-700">{confirmError}</p>
+                    )}
+                  </div>
+                )}
+              {deliveryConfirmed && (
+                <p className="mt-2 text-[11px] text-emerald-600">
+                  Entrega confirmada. Obrigado por usar a Anne &amp; Tom!
+                </p>
+              )}
             </div>
 
             {/* RESUMO DO PEDIDO */}
@@ -503,12 +554,16 @@ const OrderConfirmationPage = () => {
                         </p>
                         <p className="text-[11px] text-slate-500">
                           {item.tamanho}
-                          {item.meio && ` · meio a meio com ${item.meio}`}
+                          {Array.isArray(item.sabores) &&
+                            item.sabores.length > 1 &&
+                            ` · sabores: ${item.sabores.join(" / ")}`}
+                          {!item.sabores &&
+                            item.meio &&
+                            ` · meio a meio com ${item.meio}`}
                           {item.obsPizza && ` · ${item.obsPizza}`}
                         </p>
                       </div>
                       <p className="text-slate-700 font-medium whitespace-nowrap">
-                        R{"$ "}
                         {formatCurrencyBRL(
                           (item.precoUnitario || 0) * (item.quantidade || 0)
                         )}
@@ -522,27 +577,27 @@ const OrderConfirmationPage = () => {
                   <p className="flex justify-between">
                     <span className="text-slate-500">Subtotal</span>
                     <span className="font-medium">
-                      R$ {formatCurrencyBRL(resumo.subtotal || 0)}
+                      {formatCurrencyBRL(resumo.subtotal || 0)}
                     </span>
                   </p>
                   <p className="flex justify-between">
                     <span className="text-slate-500">Entrega</span>
                     <span className="font-medium">
-                      R$ {formatCurrencyBRL(resumo.taxaEntrega || 0)}
+                      {formatCurrencyBRL(resumo.taxaEntrega || 0)}
                     </span>
                   </p>
                   {Number(resumo.desconto || 0) > 0 && (
                     <p className="flex justify-between text-emerald-600">
                       <span>Desconto</span>
                       <span>
-                        - R$ {formatCurrencyBRL(resumo.desconto || 0)}
+                        - {formatCurrencyBRL(resumo.desconto || 0)}
                       </span>
                     </p>
                   )}
                   <p className="flex justify-between pt-1 text-sm font-semibold">
                     <span>Total</span>
                     <span>
-                      R$ {formatCurrencyBRL(resumo.totalFinal || 0)}
+                      {formatCurrencyBRL(resumo.totalFinal || 0)}
                     </span>
                   </p>
                 </div>

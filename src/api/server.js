@@ -126,12 +126,26 @@ const fetchMenu = async () => {
   }
 };
 
+const confirmDelivery = async (orderId) => {
+  try {
+    const response = await serverInstance.baseDomain.instance.post(
+      `/api/orders/${encodeURIComponent(orderId)}/status`,
+      { status: "finalizado" }
+    );
+    return toResponse(response);
+  } catch (error) {
+    console.error(error);
+    return toErrorResponse(error);
+  }
+};
+
 const server = {
   fetchStatus,
   enviarParaDesktop,
   checkCustomerByPhone,
   salvarCliente,
   fetchMenu,
+  confirmDelivery,
 };
 
 export default server;

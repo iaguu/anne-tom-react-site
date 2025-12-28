@@ -19,10 +19,8 @@ const PagamentoStep = ({
             key={tipo}
             type="button"
             onClick={() => setPagamento(tipo)}
-            className={`p-3 rounded-xl border transition ${
-              pagamento === tipo
-                ? "bg-slate-900 text-white border-slate-900"
-                : "bg-white border-slate-200 text-slate-600 hover:bg-slate-100"
+            className={`premium-pill w-full text-xs ${
+              pagamento === tipo ? "premium-pill--active" : ""
             }`}
           >
             {tipo === "pix" && "Pix (recomendado)"}
@@ -32,7 +30,7 @@ const PagamentoStep = ({
         ))}
       </div>
 
-      <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm space-y-2">
+      <div className="premium-card bg-white border border-slate-200 rounded-2xl p-4 text-sm space-y-2">
         <p className="flex justify-between">
           <span>Subtotal</span>
           <b>R$ {subtotal.toFixed(2).replace(".", ",")}</b>

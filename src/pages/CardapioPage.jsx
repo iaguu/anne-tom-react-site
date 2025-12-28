@@ -380,9 +380,9 @@ const CardapioPage = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white via-slate-50 to-slate-100">
+    <div className="premium-page min-h-screen">
       {/* HEADER */}
-      <header className="border-b bg-white/90 backdrop-blur">
+      <header className="premium-panel border-b bg-white/90 backdrop-blur">
         <div className="max-w-6xl mx-auto h-16 px-4 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-3">
             <img
@@ -397,7 +397,7 @@ const CardapioPage = () => {
           </Link>
 
           <button
-            className="text-xs border rounded-full px-4 py-1.5 bg-white hover:bg-slate-100"
+            className="premium-button-ghost text-xs px-4 py-1.5"
             onClick={() => navigate("/checkout")}
           >
             🧾 Checkout
@@ -441,19 +441,19 @@ const CardapioPage = () => {
 
           {/* BUSCA + CATEGORIA */}
           <div
-            className="sticky top-20 z-10 bg-white/90 backdrop-blur border border-slate-200 rounded-2xl px-4 py-4"
+            className="premium-panel sticky top-20 z-10 bg-white/90 backdrop-blur border border-slate-200 rounded-2xl px-4 py-4"
             style={{ top: "calc(72px + env(safe-area-inset-top, 0px))" }}
           >
           <label htmlFor="cardapio-search" className="sr-only">
             Buscar cardápio
           </label>
           <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1 flex items-center gap-2 bg-white border border-slate-200 rounded-full px-4 py-2.5">
+            <div className="premium-input flex-1">
               <span className="text-lg">🔍</span>
               <input
                 id="cardapio-search"
                 type="text"
-                className="flex-1 bg-transparent outline-none text-sm md:text-base"
+                className="premium-input-field flex-1 text-sm md:text-base"
                 placeholder="Buscar por nome ou ingrediente..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -461,7 +461,7 @@ const CardapioPage = () => {
             </div>
 
             <select
-              className="w-full md:w-56 border border-slate-200 text-sm md:text-base px-3 py-2 rounded-full bg-white"
+              className="premium-select w-full md:w-56 text-sm md:text-base"
               value={categoria}
               onChange={(e) => setCategoria(e.target.value)}
             >
@@ -500,10 +500,8 @@ const CardapioPage = () => {
               <button
                 key={tab.key}
                 onClick={() => setBadgeFilter(tab.key)}
-                className={`px-3 py-2.5 min-h-[44px] rounded-full text-xs md:text-sm border transition-colors ${
-                  badgeFilter === tab.key
-                    ? "bg-slate-900 text-white border-slate-900"
-                    : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
+                className={`premium-pill min-h-[44px] text-xs md:text-sm ${
+                  badgeFilter === tab.key ? "premium-pill--active" : ""
                 }`}
               >
                 {tab.label}
@@ -532,7 +530,7 @@ const CardapioPage = () => {
                   }}
                   onClick={() => abrirModal(pizza)}
                   aria-label={ariaLabel}
-                  className={`text-left bg-white border rounded-2xl p-5 flex gap-4 hover:shadow-lg transition-shadow ${highlightedPizzaId === pizza.id ? "border-amber-400 ring-2 ring-amber-200" : "border-slate-200"}`}
+                  className={`premium-card text-left bg-white border rounded-2xl p-5 flex gap-4 hover:shadow-lg transition-shadow ${highlightedPizzaId === pizza.id ? "border-amber-400 ring-2 ring-amber-200" : "border-slate-200"}`}
                 >
                   {/* imagem */}
                   <div className="w-24 h-24 rounded-full bg-gradient-to-br from-amber-200 via-orange-300 to-red-300 flex items-center justify-center text-3xl">
@@ -633,7 +631,7 @@ const CardapioPage = () => {
         <button
           type="button"
           onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-          className="fixed bottom-6 right-6 z-30 rounded-full bg-slate-900 text-white text-xs font-semibold px-4 py-2 shadow-lg hover:bg-slate-800"
+          className="premium-button-ghost fixed bottom-6 right-6 z-30 text-xs px-4 py-2 shadow-lg"
         >
           Voltar ao topo
         </button>
@@ -649,7 +647,7 @@ const CardapioPage = () => {
               role="dialog"
               aria-modal="true"
               tabIndex={-1}
-              className="bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-cardapio-modal"
+              className="premium-card bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-cardapio-modal"
             >
               {/* topo (imagem) */}
               <div className="h-40 bg-slate-100 flex items-center justify-center shrink-0">
@@ -678,10 +676,8 @@ const CardapioPage = () => {
                     {selectedPizza.preco_broto != null && (
                       <button
                         onClick={() => setTamanho("broto")}
-                        className={`px-4 py-2 rounded-full border text-sm ${
-                          tamanho === "broto"
-                            ? "bg-slate-900 text-white"
-                            : "bg-white border-slate-300"
+                        className={`premium-pill text-sm ${
+                          tamanho === "broto" ? "premium-pill--active" : ""
                         }`}
                       >
                         Broto ·{" "}
@@ -692,10 +688,8 @@ const CardapioPage = () => {
                     {selectedPizza.preco_grande != null && (
                       <button
                         onClick={() => setTamanho("grande")}
-                        className={`px-4 py-2 rounded-full border text-sm ${
-                          tamanho === "grande"
-                            ? "bg-slate-900 text-white"
-                            : "bg-white border-slate-300"
+                        className={`premium-pill text-sm ${
+                          tamanho === "grande" ? "premium-pill--active" : ""
                         }`}
                       >
                         Grande ·{" "}
@@ -728,7 +722,7 @@ const CardapioPage = () => {
 
                   {isMeioMeio && (
                     <select
-                      className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm"
+                      className="premium-select w-full text-sm"
                       value={meioId}
                       onChange={(e) => setMeioId(e.target.value)}
                     >
@@ -800,7 +794,7 @@ const CardapioPage = () => {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <button
-                      className="w-9 h-9 border border-slate-300 rounded-full text-lg"
+                      className="premium-button-ghost w-9 h-9 text-lg"
                       onClick={() =>
                         setQuantidade((q) => Math.max(1, q - 1))
                       }
@@ -811,7 +805,7 @@ const CardapioPage = () => {
                       {quantidade}
                     </span>
                     <button
-                      className="w-9 h-9 border border-slate-300 rounded-full text-lg"
+                      className="premium-button-ghost w-9 h-9 text-lg"
                       onClick={() => setQuantidade((q) => q + 1)}
                     >
                       +
@@ -892,7 +886,7 @@ const CardapioPage = () => {
                 {/* BOTÕES */}
                 <div className="flex flex-col sm:flex-row gap-3 pt-2">
                   <button
-                    className="flex-1 px-6 py-3 rounded-full bg-slate-900 text-white text-sm md:text-base font-semibold hover:bg-slate-800 disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="premium-button flex-1 px-6 py-3 text-sm md:text-base disabled:opacity-60 disabled:cursor-not-allowed"
                     onClick={handleAddToCart}
                     disabled={!isOpenNow}
                   >
@@ -905,7 +899,7 @@ const CardapioPage = () => {
 
                   <button
                     onClick={fecharModal}
-                    className="px-4 py-2 rounded-full border border-slate-300 text-xs md:text-sm"
+                    className="premium-button-ghost px-4 py-2 text-xs md:text-sm"
                   >
                     Cancelar
                   </button>
@@ -933,10 +927,10 @@ const CardapioPage = () => {
           <div className="pointer-events-auto max-w-6xl w-full px-4">
             <button
               onClick={() => navigate("/checkout")}
-              className="w-full flex items-center justify-between gap-3 rounded-full bg-slate-900 text-white py-3 px-5 shadow-xl text-sm md:text-base"
+              className="premium-button w-full flex items-center justify-between gap-3 py-3 px-5 shadow-xl text-sm md:text-base"
             >
               <div className="flex items-center gap-2">
-                <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-white/10 text-xs">
+                <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-black/10 text-xs">
                   {totalItensCarrinho}
                 </span>
                 <span>Ver carrinho e finalizar pedido</span>

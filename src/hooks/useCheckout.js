@@ -1,29 +1,14 @@
 // src/hooks/useCheckout.js
 import { useRef, useEffect, useMemo, useState } from "react";
 import { useCart } from "../context/CartContext";
+import { useAuth } from "../context/AuthContext";
 import server from "../api/server";
-
-/* ================= CONFIG: TAXA POR BAIRRO ================== */
-
-const TAXAS_POR_BAIRRO = {
-  Santana: 6,
-  "Alto de Santana": 7,
-  Tucuruvi: 7,
-  Mandaqui: 7,
-  "Santa Teresinha": 7,
-  "Casa Verde": 8,
-  "Vila Guilherme": 9,
-  "Outros bairros": 10,
-};
-
-const getTaxaPorBairro = (bairro) => {
-  if (!bairro) return 0;
-  if (TAXAS_POR_BAIRRO[bairro] != null) return TAXAS_POR_BAIRRO[bairro];
-  if (TAXAS_POR_BAIRRO["Outros bairros"] != null) {
-    return TAXAS_POR_BAIRRO["Outros bairros"];
-  }
-  return 0;
-};
+import {
+  getFeeByDistance,
+  getTaxaPorBairro,
+  parseDistanceKm,
+} from "../utils/deliveryFees";
+import { getDistanceMatrix } from "../utils/googleMaps";
 
 const DISTANCE_MATRIX_API_KEY =
   process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "";
@@ -40,14 +25,19 @@ const montarTextoWhatsApp = (itens, cliente, totalFinal, pagamento) => {
         .toFixed(2)
         .replace(".", ",");
 
-      const meio = i.meio ? ` · meio a meio com ${i.meio}` : "";
+      const saboresTexto =
+        Array.isArray(i.sabores) && i.sabores.length > 1
+          ? ` · sabores: ${i.sabores.join(" / ")}`
+          : i.meio
+          ? ` · meio a meio com ${i.meio}`
+          : "";
       const obsPizza = i.obsPizza ? `\n    Obs: ${i.obsPizza}` : "";
       const extrasTexto =
         Array.isArray(i.extras) && i.extras.length > 0
           ? `\n    Adicionais: ${i.extras.join(", ")}`
           : "";
 
-      return `• ${i.quantidade}x ${i.nome} (${i.tamanho}${meio}) — R$ ${totalItem}${obsPizza}${extrasTexto}`;
+      return `• ${i.quantidade}x ${i.nome} (${i.tamanho}${saboresTexto}) — R$ ${totalItem}${obsPizza}${extrasTexto}`;
     })
     .join("\n");
 
@@ -113,8 +103,10 @@ async function enviarParaDesktop(items, dados, totalFinal, pagamento) {
         quantity: i.quantidade,
         unitPrice: i.precoUnitario,
         lineTotal: i.precoUnitario * i.quantidade,
-        isHalfHalf: !!i.meio,
-        halfDescription: i.meio || "",
+        isHalfHalf: Array.isArray(i.sabores) ? i.sabores.length > 1 : !!i.meio,
+        halfDescription: Array.isArray(i.sabores)
+          ? i.sabores.join(" / ")
+          : i.meio || "",
         extras: Array.isArray(i.extras) ? i.extras : [],
       })),
 
@@ -228,6 +220,8 @@ export function useCheckout() {
   const [pagamento, setPagamento] = useState("pix");
   const [cupom, setCupom] = useState("");
 
+  const { customer } = useAuth();
+
   const [dados, setDados] = useState({
     nome: "",
     telefone: "",
@@ -256,6 +250,14 @@ export function useCheckout() {
   const [deliveryEta, setDeliveryEta] = useState(null);
   const [deliveryEtaLoading, setDeliveryEtaLoading] = useState(false);
   const [deliveryEtaError, setDeliveryEtaError] = useState("");
+  const distanceKm = useMemo(
+    () => parseDistanceKm(deliveryEta?.distanceText),
+    [deliveryEta]
+  );
+  const distanceFee = useMemo(
+    () => (distanceKm != null ? getFeeByDistance(distanceKm) : null),
+    [distanceKm]
+  );
 
   const etapas = ["Carrinho", "Dados", "Revisão", "Pagamento"];
 
@@ -301,15 +303,54 @@ export function useCheckout() {
     dados.customerId,
   ]);
 
+  useEffect(() => {
+    if (!customer) return;
+
+    setDados((prev) => ({
+      ...prev,
+      nome:
+        prev.nome ||
+        customer.nome ||
+        customer.name ||
+        customer.firstName ||
+        customer.lastName ||
+        prev.nome,
+      telefone: prev.telefone || customer.telefone || customer.phone || prev.telefone,
+      cep: prev.cep || customer.address?.cep || prev.cep,
+      endereco:
+        prev.endereco ||
+        customer.address?.street ||
+        customer.address?.endereco ||
+        prev.endereco,
+      bairro:
+        prev.bairro ||
+        customer.address?.neighborhood ||
+        customer.address?.bairro ||
+        prev.bairro,
+      customerId:
+        prev.customerId || customer.id || customer._id || customer.customerId || null,
+    }));
+    setTipoCliente("existing");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customer]);
+
   /* =========== DERIVADOS =========== */
 
   const subtotal = total;
-  const taxaEntrega = dados.retirada ? 0 : getTaxaPorBairro(dados.bairro);
+  const rawTaxa = distanceFee ?? getTaxaPorBairro(dados.bairro);
+  const taxaEntrega = dados.retirada ? 0 : rawTaxa;
   const desconto = dados.desconto || 0;
   const totalFinal = useMemo(
     () => subtotal + taxaEntrega - desconto,
     [subtotal, taxaEntrega, desconto]
   );
+
+  const deliveryFeeLabel =
+    distanceFee != null
+      ? `Distancia (${distanceKm?.toFixed(1)} km)`
+      : dados.bairro
+      ? `Bairro ${dados.bairro}`
+      : "Taxa padrao";
 
   const totalItens = useMemo(
     () => items.reduce((acc, i) => acc + i.quantidade, 0),
@@ -364,33 +405,16 @@ export function useCheckout() {
         setDeliveryEtaLoading(true);
         setDeliveryEtaError("");
 
-        const params = new URLSearchParams({
-          origins: DELIVERY_ORIGIN,
-          destinations: destination,
-          key: DISTANCE_MATRIX_API_KEY,
-          language: "pt-BR",
-          region: "br",
+        const data = await getDistanceMatrix({
+          apiKey: DISTANCE_MATRIX_API_KEY,
+          origin: DELIVERY_ORIGIN,
+          destination,
         });
-
-        const resp = await fetch(
-          `https://maps.googleapis.com/maps/api/distancematrix/json?${params.toString()}`
-        );
-
-        if (!resp.ok) {
-          throw new Error(`HTTP ${resp.status}`);
-        }
-
-        const data = await resp.json();
-        const element = data?.rows?.[0]?.elements?.[0];
-
-        if (!element || element.status !== "OK") {
-          throw new Error("Distance Matrix invalid response");
-        }
 
         if (!cancelled) {
           setDeliveryEta({
-            distanceText: element.distance?.text || "",
-            durationText: element.duration?.text || "",
+            distanceText: data.distanceText || "",
+            durationText: data.durationText || "",
           });
         }
       } catch (err) {
@@ -615,12 +639,15 @@ export function useCheckout() {
         // ignora
       }
 
-      // 6) limpa carrinho
-      clearCart();
+      // 6) limpa carrinho apenas se o envio deu certo
+      const wasSuccess = !!desktopResult?.ok;
+      if (wasSuccess) {
+        clearCart();
+      }
 
       // 7) devolve tudo pro CheckoutPage
       return {
-        success: !!desktopResult?.ok,
+        success: wasSuccess,
         order,
         orderSummary,
         orderId: backendOrderId,
@@ -685,6 +712,9 @@ export function useCheckout() {
     deliveryEta,
     deliveryEtaLoading,
     deliveryEtaError,
+    distanceKm,
+    distanceFee,
+    deliveryFeeLabel,
 
     // cart actions
     updateQuantity,

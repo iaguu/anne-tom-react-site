@@ -2,6 +2,7 @@
 import React from "react";
 import { Routes, Route, useLocation } from "react-router-dom";
 import { CartProvider } from "./context/CartContext";
+import { AuthProvider } from "./context/AuthContext";
 import HomeAnneTom from "./pages/HomeAnneTom";
 import CardapioPage from "./pages/CardapioPage";
 import CheckoutPage from "./pages/CheckoutPage";
@@ -45,9 +46,11 @@ const AppContent = () => {
 };
 
 const App = () => (
-  <CartProvider>
-    <AppContent />
-  </CartProvider>
+  <AuthProvider>
+    <CartProvider>
+      <AppContent />
+    </CartProvider>
+  </AuthProvider>
 );
 
 export default App;

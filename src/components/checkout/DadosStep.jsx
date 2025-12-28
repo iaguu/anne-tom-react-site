@@ -1,5 +1,6 @@
 // src/components/checkout/DadosStep.jsx
 import React from "react";
+import { getTaxaPorBairro } from "../../utils/deliveryFees";
 
 const DadosStep = ({
   dados,
@@ -19,8 +20,10 @@ const DadosStep = ({
   deliveryEta,
   deliveryEtaLoading,
   deliveryEtaError,
+  distanceFee,
+  deliveryFeeLabel,
 }) => {
-  const taxaBairro = dados.retirada ? 0 : getTaxaPorBairroLocal(dados.bairro);
+  const taxaBairro = dados.retirada ? 0 : getTaxaPorBairro(dados.bairro);
 
   const getPhoneDigits = (value) => value.replace(/\D/g, "").slice(0, 11);
 
@@ -80,7 +83,7 @@ React.useEffect(() => {
       <h2 className="font-semibold text-lg">Dados e entrega</h2>
 
       {/* PERGUNTA PRINCIPAL */}
-      <section className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      <section className="premium-panel p-3 rounded-2xl bg-white/80 border border-slate-200 text-xs flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-slate-800">
             Você já é cliente Anne &amp; Tom?
@@ -89,14 +92,12 @@ React.useEffect(() => {
             Escolha uma opção abaixo e digite seu telefone para continuarmos.
           </p>
         </div>
-        <div className="inline-flex rounded-full bg-slate-100 p-1">
+        <div className="inline-flex flex-wrap gap-2">
           <button
             type="button"
             onClick={() => setTipoCliente("existing")}
-            className={`px-3 py-1 rounded-full text-[11px] ${
-              tipoCliente === "existing"
-                ? "bg-slate-900 text-white"
-                : "text-slate-700"
+            className={`premium-pill premium-pill--sm text-[11px] ${
+              tipoCliente === "existing" ? "premium-pill--active" : ""
             }`}
           >
             Já sou cliente
@@ -104,10 +105,8 @@ React.useEffect(() => {
           <button
             type="button"
             onClick={() => setTipoCliente("novo")}
-            className={`px-3 py-1 rounded-full text-[11px] ${
-              tipoCliente === "novo"
-                ? "bg-slate-900 text-white"
-                : "text-slate-700"
+            className={`premium-pill premium-pill--sm text-[11px] ${
+              tipoCliente === "novo" ? "premium-pill--active" : ""
             }`}
           >
             Primeira vez aqui
@@ -129,7 +128,7 @@ React.useEffect(() => {
             placeholder="Telefone / WhatsApp"
             value={dados.telefone}
             onChange={handleTelefoneChange}
-            className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300"
+            className="premium-field w-full"
           />
 
           {tipoCliente === "existing" && (
@@ -181,7 +180,7 @@ React.useEffect(() => {
           placeholder="Nome completo"
           value={dados.nome}
           onChange={(e) => setDados({ ...dados, nome: e.target.value })}
-          className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300"
+          className="premium-field w-full"
         />
 
         <div className="grid md:grid-cols-[2fr_1fr] gap-3 items-center">
@@ -191,13 +190,13 @@ React.useEffect(() => {
             value={dados.cep}
             onChange={(e) => setDados({ ...dados, cep: e.target.value })}
             onBlur={buscarCep}
-            className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300"
+            className="premium-field w-full"
           />
           <button
             type="button"
             onClick={buscarCep}
             disabled={buscandoCep}
-            className="px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 disabled:opacity-60"
+            className="premium-button-ghost px-4 py-2 text-xs disabled:opacity-60"
           >
             {buscandoCep ? "Buscando CEP..." : "Recarregar pelo CEP"}
           </button>
@@ -213,7 +212,7 @@ React.useEffect(() => {
           onChange={(e) =>
             setDados({ ...dados, endereco: e.target.value })
           }
-          className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300"
+          className="premium-field w-full"
         />
 
         <div className="grid md:grid-cols-2 gap-4 items-start">
@@ -223,7 +222,16 @@ React.useEffect(() => {
                 <p className="font-semibold text-slate-800">
                   Bairro detectado: {dados.bairro}
                 </p>
-                {!dados.retirada && (
+                {!dados.retirada && distanceFee != null && (
+                  <p className="mt-1 text-[11px] text-emerald-700">
+                    Taxa calculada por {deliveryFeeLabel}:{" "}
+                    <strong>
+                      R${" "}
+                      {distanceFee.toFixed(2).replace(".", ",")}
+                    </strong>
+                  </p>
+                )}
+                {!dados.retirada && distanceFee == null && (
                   <p className="mt-1 text-[11px] text-slate-600">
                     Taxa de entrega:{" "}
                     <strong>
@@ -288,7 +296,7 @@ React.useEffect(() => {
           onChange={(e) =>
             setDados({ ...dados, obsGerais: e.target.value })
           }
-          className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300"
+          className="premium-field w-full"
         />
 
         <div className="grid md:grid-cols-[2fr_1fr] gap-3 items-center">
@@ -297,12 +305,12 @@ React.useEffect(() => {
             placeholder="Cupom (ex.: PRIMEIRA)"
             value={cupom}
             onChange={(e) => setCupom(e.target.value)}
-            className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-sm"
+            className="premium-field w-full text-sm"
           />
           <button
             type="button"
             onClick={aplicarCupom}
-            className="px-4 py-2 rounded-xl bg-slate-200 text-xs hover:bg-slate-300"
+            className="premium-button-ghost px-4 py-2 text-xs"
           >
             Aplicar cupom
           </button>
@@ -311,26 +319,5 @@ React.useEffect(() => {
     </div>
   );
 };
-
-// função local para exibir taxa no card de bairro (usa mesmo mapa)
-const TAXAS_POR_BAIRRO_LOCAL = {
-  Santana: 6,
-  "Alto de Santana": 7,
-  Tucuruvi: 7,
-  Mandaqui: 7,
-  "Santa Teresinha": 7,
-  "Casa Verde": 8,
-  "Vila Guilherme": 9,
-  "Outros bairros": 10,
-};
-
-function getTaxaPorBairroLocal(bairro) {
-  if (!bairro) return 0;
-  if (TAXAS_POR_BAIRRO_LOCAL[bairro] != null)
-    return TAXAS_POR_BAIRRO_LOCAL[bairro];
-  if (TAXAS_POR_BAIRRO_LOCAL["Outros bairros"] != null)
-    return TAXAS_POR_BAIRRO_LOCAL["Outros bairros"];
-  return 0;
-}
 
 export default DadosStep;

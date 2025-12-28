@@ -12,7 +12,7 @@ const ResumoLateral = ({
 }) => {
   if (!items.length) {
     return (
-      <div className="bg-white border border-slate-200 rounded-2xl p-4 text-xs shadow-sm">
+      <div className="premium-card bg-white border border-slate-200 rounded-2xl p-4 text-xs shadow-sm">
         <p className="font-semibold text-slate-800 mb-1">
           Carrinho vazio por enquanto
         </p>
@@ -24,7 +24,7 @@ const ResumoLateral = ({
   }
 
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-4 text-xs shadow-sm space-y-3">
+    <div className="premium-card bg-white border border-slate-200 rounded-2xl p-4 text-xs shadow-sm space-y-3">
       <p className="font-semibold text-slate-800">Resumo do pedido</p>
       <ul className="divide-y divide-slate-200">
         {items.map((item) => (
@@ -36,10 +36,17 @@ const ResumoLateral = ({
               <p className="font-semibold">
                 {item.quantidade}x {item.nome}
               </p>
-              <p className="text-[11px] text-slate-500">
-                {item.tamanho}
-                {item.meio && ` · meio a meio com ${item.meio}`}
-              </p>
+              <p className="text-[11px] text-slate-500">{item.tamanho}</p>
+              {Array.isArray(item.sabores) && item.sabores.length > 1 && (
+                <p className="text-[11px] text-slate-500">
+                  Sabores: {item.sabores.join(" / ")}
+                </p>
+              )}
+              {!item.sabores && item.meio && (
+                <p className="text-[11px] text-slate-500">
+                  Meio a meio com {item.meio}
+                </p>
+              )}
               {Array.isArray(item.extras) && item.extras.length > 0 && (
                 <p className="text-[11px] text-slate-500">
                   Adicionais: {item.extras.join(", ")}

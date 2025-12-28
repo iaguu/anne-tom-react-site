@@ -12,7 +12,8 @@ import RetryBanner from "../components/ui/RetryBanner";
 
 import SiteFooter from "../components/layout/SiteFooter";
 
-const PIZZA_IMAGE_SRC = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 900 900'><rect fill='%23FAF6F0' width='900' height='900' rx='120'/><circle cx='450' cy='450' r='380' fill='%23f5c16c' stroke='%23a63f1b' stroke-width='50'/><circle cx='450' cy='450' r='270' fill='%23f9dd93'/><circle cx='450' cy='450' r='220' fill='%23f5c16c'/><circle cx='450' cy='450' r='190' fill='%238b2f0b'/><g stroke='%23f4b042' stroke-width='35'><line x1='450' y1='110' x2='450' y2='790'/><line x1='110' y1='450' x2='790' y2='450'/><line x1='190' y1='190' x2='710' y2='710'/><line x1='710' y1='190' x2='190' y2='710'/></g><g fill='%23f4b042'><circle cx='320' cy='340' r='35'/><circle cx='580' cy='300' r='30'/><circle cx='430' cy='560' r='32'/><circle cx='360' cy='520' r='26'/><circle cx='500' cy='420' r='28'/><circle cx='610' cy='520' r='24'/></g></svg>`;
+const PIZZA_IMAGE_SRC =
+  "https://recipesblob.oetker.com.br/assets/fa238f6f683d4e8aa6260db042e82f73/1272x764/pizza-caseira-lucas-alencar.webp";
 
 
 
@@ -104,7 +105,7 @@ const HomeAnneTom = () => {
 
   return (
 
-    <div className="min-h-screen bg-slate-50 text-slate-900 antialiased">
+    <div className="home-anne-tom min-h-screen text-slate-900 antialiased">
 
       <div className="animate-page-in">
 
@@ -595,9 +596,11 @@ const Header = ({ scrolled }) => {
 
 const Hero = ({ imageLoaded, setImageLoaded, highlights = [] }) => (
 
-  <section className="bg-gradient-to-b from-amber-50 via-slate-50 to-slate-100">
+  <section className="home-hero">
+    <div className="home-hero-glow" aria-hidden="true" />
+    <div className="home-hero-grid" aria-hidden="true" />
 
-    <div className="max-w-6xl mx-auto px-4 lg:px-6 py-12 lg:py-20 grid lg:grid-cols-2 gap-10 lg:gap-14 items-center">
+    <div className="home-hero-inner max-w-6xl mx-auto px-4 lg:px-6 py-12 lg:py-20 grid lg:grid-cols-2 gap-10 lg:gap-14 items-center">
 
       {/* TEXTO */}
 
@@ -718,7 +721,7 @@ const Hero = ({ imageLoaded, setImageLoaded, highlights = [] }) => (
 
       <div className="relative flex justify-center lg:justify-end">
 
-        <div className="w-full max-w-md aspect-[4/3] rounded-3xl overflow-hidden shadow-xl border border-slate-200 bg-slate-100 animate-fade-in-image">
+        <div className="home-hero-image w-full max-w-md aspect-[4/3] rounded-3xl overflow-hidden shadow-xl border border-slate-200 bg-slate-100 animate-fade-in-image">
 
           {!imageLoaded && (
 
@@ -886,7 +889,7 @@ const BestSellerCard = ({ item, onSelect }) => (
   <button
     type="button"
     onClick={() => onSelect?.(item)}
-    className="bg-white rounded-2xl border border-slate-100 shadow-sm px-4 py-5 flex flex-col gap-2 hover:shadow-md hover:-translate-y-[2px] transition transform text-left"
+    className="home-card bg-white rounded-2xl border border-slate-100 shadow-sm px-4 py-5 flex flex-col gap-2 hover:shadow-md hover:-translate-y-[2px] transition transform text-left"
   >
       <div className="flex items-center justify-between mb-1">
         <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-amber-50 text-[11px] font-medium text-amber-700">
@@ -994,7 +997,7 @@ const VeggieSection = ({ items = [], loading = false, menuError = "" }) => {
                 key={item.id || item.name}
                 type="button"
                 onClick={() => handleOpen(item)}
-                className="bg-white rounded-2xl border border-emerald-100 shadow-sm px-4 py-5 flex flex-col gap-2 hover:shadow-md hover:-translate-y-[2px] transition transform text-left"
+                className="home-card bg-white rounded-2xl border border-emerald-100 shadow-sm px-4 py-5 flex flex-col gap-2 hover:shadow-md hover:-translate-y-[2px] transition transform text-left"
               >
             <div className="flex items-center gap-3">
               <span className="text-xl font-bold text-emerald-600">{item.icon}</span>
@@ -1092,7 +1095,7 @@ const HowItWorks = () => (
 
 const StepCard = ({ index, title, text }) => (
 
-  <div className="bg-slate-50 rounded-2xl border border-slate-100 px-5 py-6 flex flex-col gap-2">
+  <div className="home-card bg-slate-50 rounded-2xl border border-slate-100 px-5 py-6 flex flex-col gap-2">
 
     <span className="w-8 h-8 flex items-center justify-center rounded-full bg-amber-500 text-[12px] font-bold text-white">
 
@@ -1254,9 +1257,9 @@ const AvatarBubble = ({ shade = "300" }) => (
 
 const SectionWrapper = ({ children, id, bg, border }) => (
 
-  <section id={id} className={`${bg} ${border}`}>
+  <section id={id} className={`home-section ${bg} ${border}`}>
 
-    <div className="max-w-6xl mx-auto px-4 lg:px-6 py-12 lg:py-16 space-y-6">
+    <div className="home-section-inner max-w-6xl mx-auto px-4 lg:px-6 py-12 lg:py-16 space-y-6">
 
       {children}
 
@@ -1270,11 +1273,11 @@ const SectionWrapper = ({ children, id, bg, border }) => (
 
 const SectionTitle = ({ eyebrow, title, subtitle }) => (
 
-  <div className="text-center space-y-3 max-w-3xl mx-auto">
+  <div className="home-section-title text-center space-y-3 max-w-3xl mx-auto">
 
     {eyebrow && (
 
-      <p className="uppercase text-[11px] tracking-[0.2em] text-amber-600">
+      <p className="home-eyebrow uppercase text-[11px] tracking-[0.2em] text-amber-600">
 
         {eyebrow}
 
@@ -1298,7 +1301,7 @@ const SectionTitle = ({ eyebrow, title, subtitle }) => (
 
 const FeatureCard = ({ icon, title, text }) => (
 
-  <div className="bg-white rounded-2xl border border-slate-100 shadow-sm px-5 py-6 flex flex-col gap-3 items-center text-center hover:shadow-md hover:-translate-y-[1px] transition transform">
+  <div className="home-card bg-white rounded-2xl border border-slate-100 shadow-sm px-5 py-6 flex flex-col gap-3 items-center text-center hover:shadow-md hover:-translate-y-[1px] transition transform">
 
     <div className="text-3xl md:text-4xl">{icon}</div>
 
@@ -1322,7 +1325,7 @@ const FeatureCard = ({ icon, title, text }) => (
 
 const Testimonial = ({ name, text }) => (
 
-  <div className="bg-white rounded-2xl border border-slate-100 shadow-sm px-4 py-5 flex flex-col gap-2">
+  <div className="home-card bg-white rounded-2xl border border-slate-100 shadow-sm px-4 py-5 flex flex-col gap-2">
 
     <p className="text-[12px] text-amber-500">★★★★★</p>
 
@@ -1348,9 +1351,9 @@ const Testimonial = ({ name, text }) => (
 
 const FinalCTA = () => (
 
-  <section className="bg-slate-900">
+  <section className="home-cta">
 
-    <div className="max-w-6xl mx-auto px-4 lg:px-6 py-12 lg:py-16 text-center space-y-4 text-white">
+    <div className="home-cta-inner max-w-6xl mx-auto px-4 lg:px-6 py-12 lg:py-16 text-center space-y-4 text-white">
 
       <h2 className="text-2xl lg:text-3xl font-black tracking-tight">
 
@@ -1413,7 +1416,7 @@ const APP_DOWNLOAD_WHATSAPP =
 
 const DownloadAppSection = () => (
   <section className="mx-4 lg:mx-0">
-    <div className="max-w-6xl mx-auto transform rounded-3xl border border-slate-800 bg-slate-900 px-6 py-10 text-white shadow-2xl shadow-slate-900/30">
+    <div className="home-cta-panel max-w-6xl mx-auto transform rounded-3xl border border-slate-800 bg-slate-900 px-6 py-10 text-white shadow-2xl shadow-slate-900/30">
       <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.4em] text-amber-300">
@@ -1463,49 +1466,173 @@ const DownloadAppSection = () => (
 
 
 const styles = `
+  @import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,800&family=Manrope:wght@400;600;700&display=swap");
+
+  .home-anne-tom {
+    --home-bg: radial-gradient(1200px 700px at 50% -10%, #fff0dc 0%, #fff7ed 45%, #f4f6f9 100%);
+    --home-ink: #1b1b1b;
+    --home-muted: #5d5a55;
+    --home-accent: #f07a3f;
+    --home-accent-2: #c94227;
+    --home-cream: #fff2e4;
+    --home-card: #ffffff;
+    --home-border: rgba(15, 23, 42, 0.08);
+    --home-shadow: 0 35px 70px -50px rgba(15, 23, 42, 0.55);
+    background: var(--home-bg);
+    color: var(--home-ink);
+    font-family: "Manrope", sans-serif;
+  }
+
+  .home-anne-tom h1,
+  .home-anne-tom h2,
+  .home-anne-tom h3 {
+    font-family: "Fraunces", serif;
+    letter-spacing: -0.02em;
+  }
+
+  .home-hero {
+    position: relative;
+    overflow: hidden;
+    background: radial-gradient(1200px 600px at 20% 0%, #fff3e3 0%, #fdf8f2 55%, #f2f4f8 100%);
+  }
+
+  .home-hero-inner {
+    position: relative;
+    z-index: 1;
+  }
+
+  .home-hero-glow {
+    position: absolute;
+    top: -30%;
+    left: 50%;
+    width: 900px;
+    height: 900px;
+    transform: translateX(-50%);
+    background: radial-gradient(circle at center, rgba(240, 122, 63, 0.28), rgba(255, 255, 255, 0));
+    pointer-events: none;
+  }
+
+  .home-hero-grid {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(15, 23, 42, 0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(15, 23, 42, 0.06) 1px, transparent 1px);
+    background-size: 48px 48px;
+    opacity: 0.2;
+    pointer-events: none;
+  }
+
+  .home-hero-image {
+    box-shadow: var(--home-shadow);
+    position: relative;
+  }
+
+  .home-hero-image::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    pointer-events: none;
+  }
+
+  .home-section {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .home-section::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(600px 300px at 80% 0%, rgba(240, 122, 63, 0.08), transparent 65%);
+    pointer-events: none;
+  }
+
+  .home-section-inner {
+    position: relative;
+    z-index: 1;
+  }
+
+  .home-section-title::after {
+    content: "";
+    display: block;
+    width: 72px;
+    height: 3px;
+    margin: 16px auto 0;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #f07a3f, #c94227);
+  }
+
+  .home-eyebrow {
+    letter-spacing: 0.35em;
+    color: var(--home-accent-2);
+  }
+
+  .home-card {
+    background: var(--home-card);
+    border-color: var(--home-border);
+    box-shadow: 0 20px 45px -35px rgba(15, 23, 42, 0.45);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  }
+
+  .home-card:hover {
+    border-color: rgba(240, 122, 63, 0.35);
+    box-shadow: var(--home-shadow);
+    transform: translateY(-3px);
+  }
+
+  .home-cta {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(135deg, #0f0f0f 0%, #26170f 55%, #0b0b0b 100%);
+  }
+
+  .home-cta::before {
+    content: "";
+    position: absolute;
+    inset: -40% 10% auto;
+    height: 180%;
+    background: radial-gradient(circle at 60% 40%, rgba(240, 122, 63, 0.22), transparent 70%);
+    pointer-events: none;
+  }
+
+  .home-cta-inner {
+    position: relative;
+    z-index: 1;
+  }
+
+  .home-cta-panel {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+    border-color: rgba(255, 255, 255, 0.18);
+  }
 
   .animate-page-in {
-
     animation: pageIn 0.35s ease-out;
-
   }
 
   .animate-fade-up {
-
     animation: fadeUp 0.45s ease-out;
-
   }
 
   .animate-fade-in-image {
-
     animation: fadeInImage 0.6s ease-out;
-
   }
 
-
-
   @keyframes pageIn {
-
     from { opacity: 0; transform: translateY(8px); }
-
     to   { opacity: 1; transform: translateY(0); }
-
   }
 
   @keyframes fadeUp {
-
     from { opacity: 0; transform: translateY(10px); }
-
     to   { opacity: 1; transform: translateY(0); }
-
   }
 
   @keyframes fadeInImage {
-
     from { opacity: 0; transform: scale(1.02); }
-
     to   { opacity: 1; transform: scale(1); }
-
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -1517,7 +1644,6 @@ const styles = `
       animation-fill-mode: both !important;
     }
   }
-
 `;
 
 

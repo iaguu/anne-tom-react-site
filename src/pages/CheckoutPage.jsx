@@ -60,6 +60,8 @@ const CheckoutPage = () => {
     deliveryEta,
     deliveryEtaLoading,
     deliveryEtaError,
+    distanceFee,
+    deliveryFeeLabel,
 
     // cart actions
     updateQuantity,
@@ -172,9 +174,9 @@ const CheckoutPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
+    <div className="premium-page min-h-screen text-slate-900">
       {/* HEADER */}
-      <header className="border-b bg-white">
+      <header className="premium-panel border-b bg-white">
         <div className="max-w-6xl mx-auto h-16 px-4 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
             <img
@@ -192,7 +194,7 @@ const CheckoutPage = () => {
 
           <Link
             to="/cardapio"
-            className="text-xs border rounded-full px-4 py-1.5 hover:bg-slate-100"
+            className="premium-button-ghost text-xs px-4 py-1.5"
           >
             ← Voltar ao cardápio
           </Link>
@@ -219,7 +221,7 @@ const CheckoutPage = () => {
 
         {/* PRINCIPAL + RESUMO */}
         <div className="grid lg:grid-cols-[minmax(0,2fr)_minmax(260px,1fr)] gap-6">
-          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 space-y-6">
+          <div className="premium-card bg-white border border-slate-200 rounded-2xl shadow-sm p-6 space-y-6">
             {passo === 0 && (
               <CarrinhoStep
                 items={items}
@@ -247,6 +249,8 @@ const CheckoutPage = () => {
                 deliveryEta={deliveryEta}
                 deliveryEtaLoading={deliveryEtaLoading}
                 deliveryEtaError={deliveryEtaError}
+                distanceFee={distanceFee}
+                deliveryFeeLabel={deliveryFeeLabel}
               />
             )}
 
@@ -276,7 +280,7 @@ const CheckoutPage = () => {
               <button
                 onClick={voltar}
                 disabled={passo === 0}
-                className={`px-5 py-2 rounded-full text-xs border border-slate-300 hover:bg-slate-100 ${
+                className={`premium-button-ghost px-5 py-2 text-xs ${
                   passo === 0 ? "opacity-40 cursor-not-allowed" : ""
                 }`}
               >
@@ -286,7 +290,7 @@ const CheckoutPage = () => {
               {passo < 2 && (
                 <button
                   onClick={avancar}
-                  className="px-6 py-2 rounded-full text-xs font-semibold bg-slate-900 text-white hover:bg-slate-800"
+                  className="premium-button px-6 py-2 text-xs font-semibold"
                 >
                   Avançar →
                   {passo === 0 && totalItens > 0 && (
@@ -300,7 +304,7 @@ const CheckoutPage = () => {
               {passo === 2 && (
                 <button
                   onClick={avancar}
-                  className="px-6 py-2 rounded-full text-xs font-semibold bg-slate-900 text-white hover:bg-slate-800"
+                  className="premium-button px-6 py-2 text-xs font-semibold"
                 >
                   Confirmar e ir para pagamento →
                 </button>
@@ -310,10 +314,8 @@ const CheckoutPage = () => {
                 <button
                   onClick={handleEnviarPedido}
                   disabled={!podeEnviar}
-                  className={`px-7 py-3 rounded-full text-xs font-semibold ${
-                    podeEnviar
-                      ? "bg-emerald-500 text-slate-900 hover:bg-emerald-400"
-                      : "bg-slate-200 text-slate-400 cursor-not-allowed"
+                  className={`premium-button premium-button--success px-7 py-3 text-xs font-semibold ${
+                    podeEnviar ? "" : "opacity-60 cursor-not-allowed"
                   }`}
                 >
                   {enviando ? "Enviando..." : "Enviar Pedido"}
