@@ -54,6 +54,11 @@ const CarrinhoStep = ({ items, updateQuantity, removeItem }) => {
                   ))}
                 </div>
               )}
+              {item.borda && (
+                <p className="text-[11px] text-slate-500">
+                  Borda: {item.borda}
+                </p>
+              )}
               {Array.isArray(item.extras) && item.extras.length > 0 && (
                 <p className="text-[11px] text-slate-500">
                   Adicionais: {item.extras.join(", ")}

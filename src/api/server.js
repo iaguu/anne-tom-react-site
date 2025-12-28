@@ -1,11 +1,28 @@
 import axios from 'axios';
 
-const apiKey = process.env.REACT_APP_AT_API_KEY;
-const publicToken = process.env.REACT_APP_PUBLIC_API_TOKEN;
 const runtimeConfig =
   typeof window !== "undefined"
     ? window.__ANNE_TOM_CONFIG__ || window.__APP_CONFIG__
     : undefined;
+const apiKey = process.env.REACT_APP_AT_API_KEY;
+const publicToken = process.env.REACT_APP_PUBLIC_API_TOKEN;
+const axionApiKey =
+  process.env.REACT_APP_AXIONPAY_API_KEY ||
+  process.env.REACT_APP_AXION_PAY_API_KEY ||
+  runtimeConfig?.axionPayApiKey ||
+  runtimeConfig?.axionpayApiKey;
+const axionBearer =
+  process.env.REACT_APP_AXIONPAY_BEARER ||
+  process.env.REACT_APP_AXION_PAY_BEARER ||
+  runtimeConfig?.axionPayBearer ||
+  runtimeConfig?.axionpayBearer;
+const axionBaseUrl =
+  process.env.REACT_APP_AXIONPAY_BASE_URL ||
+  process.env.REACT_APP_AXIONPAY_API_URL ||
+  process.env.REACT_APP_AXION_PAY_BASE_URL ||
+  runtimeConfig?.axionPayBaseUrl ||
+  runtimeConfig?.axionpayBaseUrl ||
+  "http://localhost:3000";
 
 const toResponse = (response) => ({
   ok: response.status >= 200 && response.status < 300,
@@ -59,6 +76,18 @@ export const serverInstance = {
         ...(!apiKey && !publicToken && runtimeConfig?.apiKey
           ? { Authorization: `Bearer ${runtimeConfig.apiKey}` }
           : {}),
+      },
+    }),
+  },
+  paymentsDomain: {
+    instance: axios.create({
+      timeout: 15000,
+      baseURL: axionBaseUrl,
+      validateStatus: () => true,
+      headers: {
+        Accept: "application/json",
+        ...(axionApiKey ? { "x-api-key": axionApiKey } : {}),
+        ...(axionBearer ? { Authorization: `Bearer ${axionBearer}` } : {}),
       },
     }),
   },
@@ -126,11 +155,52 @@ const fetchMenu = async () => {
   }
 };
 
+const fetchOrders = async () => {
+  try {
+    const response = await serverInstance.baseDomain.instance.get(`/api/orders`);
+    return toResponse(response);
+  } catch (error) {
+    console.error(error);
+    return toErrorResponse(error);
+  }
+};
+
+const fetchBusinessHours = async () => {
+  try {
+    const response = await serverInstance.baseDomain.instance.get(
+      `/api/pdv/business-hours`
+    );
+    return toResponse(response);
+  } catch (error) {
+    console.error(error);
+    return toErrorResponse(error);
+  }
+};
+
 const confirmDelivery = async (orderId) => {
   try {
     const response = await serverInstance.baseDomain.instance.post(
       `/api/orders/${encodeURIComponent(orderId)}/status`,
       { status: "finalizado" }
+    );
+    return toResponse(response);
+  } catch (error) {
+    console.error(error);
+    return toErrorResponse(error);
+  }
+};
+
+const createPixPayment = async (params = {}, idempotencyKey) => {
+  try {
+    const payload = normalizePayload(params);
+    const response = await serverInstance.paymentsDomain.instance.post(
+      `/payments/pix`,
+      payload,
+      {
+        headers: idempotencyKey
+          ? { "Idempotency-Key": idempotencyKey }
+          : undefined,
+      }
     );
     return toResponse(response);
   } catch (error) {
@@ -145,7 +215,10 @@ const server = {
   checkCustomerByPhone,
   salvarCliente,
   fetchMenu,
+  fetchOrders,
+  fetchBusinessHours,
   confirmDelivery,
+  createPixPayment,
 };
 
 export default server;

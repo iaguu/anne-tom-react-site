@@ -1,13 +1,9 @@
 // src/hooks/useCheckout.js
-import { useRef, useEffect, useMemo, useState } from "react";
+import { useCallback, useRef, useEffect, useMemo, useState } from "react";
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 import server from "../api/server";
-import {
-  getFeeByDistance,
-  getTaxaPorBairro,
-  parseDistanceKm,
-} from "../utils/deliveryFees";
+import { getFeeByDistance, parseDistanceKm } from "../utils/deliveryFees";
 import { getDistanceMatrix } from "../utils/googleMaps";
 
 const DISTANCE_MATRIX_API_KEY =
@@ -34,10 +30,13 @@ const montarTextoWhatsApp = (itens, cliente, totalFinal, pagamento) => {
       const obsPizza = i.obsPizza ? `\n    Obs: ${i.obsPizza}` : "";
       const extrasTexto =
         Array.isArray(i.extras) && i.extras.length > 0
-          ? `\n    Adicionais: ${i.extras.join(", ")}`
+          ? `
+    Adicionais: ${i.extras.join(", ")}`
           : "";
+      const bordaTexto = i.borda ? `
+    Borda: ${i.borda}` : "";
 
-      return `• ${i.quantidade}x ${i.nome} (${i.tamanho}${saboresTexto}) — R$ ${totalItem}${obsPizza}${extrasTexto}`;
+      return `? ${i.quantidade}x ${i.nome} (${i.tamanho}${saboresTexto}) ? R$ ${totalItem}${obsPizza}${extrasTexto}${bordaTexto}`;
     })
     .join("\n");
 
@@ -88,6 +87,16 @@ async function enviarParaDesktop(items, dados, totalFinal, pagamento) {
         method: pagamento,
         changeFor: pagamento === "dinheiro" ? dados.troco || null : null,
         status: "pending",
+        pix:
+          pagamento === "pix" && dados.pixPayment
+            ? {
+                providerReference: dados.pixPayment.providerReference || null,
+                transactionId: dados.pixPayment.transactionId || null,
+                copiaColar: dados.pixPayment.copiaColar || null,
+                qrcode: dados.pixPayment.qrcode || null,
+                expiresAt: dados.pixPayment.expiresAt || null,
+              }
+            : null,
       },
 
       delivery: {
@@ -95,20 +104,28 @@ async function enviarParaDesktop(items, dados, totalFinal, pagamento) {
         fee: dados.taxaEntrega,
       },
 
-      items: items.map((i) => ({
-        lineId: `${Date.now()}-${Math.random()}`,
-        productId: i.idPizza || i.id,
-        name: i.nome,
-        size: i.tamanho,
-        quantity: i.quantidade,
-        unitPrice: i.precoUnitario,
-        lineTotal: i.precoUnitario * i.quantidade,
-        isHalfHalf: Array.isArray(i.sabores) ? i.sabores.length > 1 : !!i.meio,
-        halfDescription: Array.isArray(i.sabores)
-          ? i.sabores.join(" / ")
-          : i.meio || "",
-        extras: Array.isArray(i.extras) ? i.extras : [],
-      })),
+      items: items.map((i) => {
+        const extras = Array.isArray(i.extras) ? i.extras : [];
+        const extrasPayload = i.borda
+          ? [...extras, `Borda: ${i.borda}`]
+          : extras;
+
+        return {
+          lineId: `${Date.now()}-${Math.random()}`,
+          productId: i.idPizza || i.id,
+          name: i.nome,
+          size: i.tamanho,
+          quantity: i.quantidade,
+          unitPrice: i.precoUnitario,
+          lineTotal: i.precoUnitario * i.quantidade,
+          isHalfHalf: Array.isArray(i.sabores) ? i.sabores.length > 1 : !!i.meio,
+          halfDescription: Array.isArray(i.sabores)
+            ? i.sabores.join(" / ")
+            : i.meio || "",
+          extras: extrasPayload,
+          border: i.borda || null,
+        };
+      }),
 
       totals: {
         subtotal: dados.subtotal,
@@ -219,6 +236,11 @@ export function useCheckout() {
   const [passo, setPasso] = useState(0);
   const [pagamento, setPagamento] = useState("pix");
   const [cupom, setCupom] = useState("");
+  const [pixPayment, setPixPayment] = useState(null);
+  const [pixLoading, setPixLoading] = useState(false);
+  const [pixError, setPixError] = useState("");
+  const pixIdempotencyRef = useRef(null);
+  const pixTotalRef = useRef(null);
 
   const { customer } = useAuth();
 
@@ -257,6 +279,14 @@ export function useCheckout() {
   const distanceFee = useMemo(
     () => (distanceKm != null ? getFeeByDistance(distanceKm) : null),
     [distanceKm]
+  );
+  const telefoneDigits = useMemo(
+    () => (dados.telefone || "").replace(/\D/g, ""),
+    [dados.telefone]
+  );
+  const cepDigits = useMemo(
+    () => (dados.cep || "").replace(/\D/g, ""),
+    [dados.cep]
   );
 
   const etapas = ["Carrinho", "Dados", "Revisão", "Pagamento"];
@@ -337,7 +367,7 @@ export function useCheckout() {
   /* =========== DERIVADOS =========== */
 
   const subtotal = total;
-  const rawTaxa = distanceFee ?? getTaxaPorBairro(dados.bairro);
+  const rawTaxa = distanceFee ?? 0;
   const taxaEntrega = dados.retirada ? 0 : rawTaxa;
   const desconto = dados.desconto || 0;
   const totalFinal = useMemo(
@@ -359,11 +389,34 @@ export function useCheckout() {
 
   const semItens = items.length === 0;
 
+  const dadosBasicosValidos =
+    Boolean(dados.nome.trim()) &&
+    telefoneDigits.length >= 10 &&
+    tipoCliente !== "auto";
+  const enderecoValido = dados.retirada
+    ? true
+    : Boolean(dados.endereco.trim()) &&
+      Boolean(dados.bairro.trim()) &&
+      cepDigits.length === 8;
+  const dadosValidos = dadosBasicosValidos && enderecoValido;
+  const distanciaOk = dados.retirada
+    ? true
+    : distanceFee != null &&
+      !deliveryEtaLoading &&
+      !deliveryEtaError;
+  const podeAvancarDados = dadosValidos && distanciaOk;
+
+  const hasPixData =
+    pagamento !== "pix" ||
+    Boolean(
+      pixPayment?.copiaColar ||
+        pixPayment?.qrcode
+    );
+
   const podeEnviar =
     !semItens &&
-    dados.nome.trim() &&
-    dados.telefone.trim() &&
-    (dados.retirada || dados.endereco.trim()) &&
+    podeAvancarDados &&
+    hasPixData &&
     !enviando;
 
   /* =========== CUPOM =========== */
@@ -373,6 +426,123 @@ export function useCheckout() {
       setDados((d) => ({ ...d, desconto: 5 }));
     } else {
       setDados((d) => ({ ...d, desconto: 0 }));
+    }
+  };
+
+  /* =========== PIX (AXIONPAY) =========== */
+
+  const resetPixPayment = useCallback(() => {
+    setPixPayment(null);
+    setPixError("");
+    pixIdempotencyRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    if (pagamento !== "pix") {
+      resetPixPayment();
+    }
+  }, [pagamento, resetPixPayment]);
+
+  useEffect(() => {
+    const previousTotal = pixTotalRef.current;
+    pixTotalRef.current = totalFinal;
+
+    if (pagamento !== "pix") return;
+    if (previousTotal == null) return;
+    if (previousTotal === totalFinal) return;
+    if (!pixPayment) return;
+
+    resetPixPayment();
+  }, [totalFinal, pagamento, pixPayment, resetPixPayment]);
+
+  const buildPixPayload = (customerIdAtual) => {
+    const amountCents = Math.max(1, Math.round(totalFinal * 100));
+    const phoneDigits = (dados.telefone || "").replace(/\D/g, "");
+
+    return {
+      amount_cents: amountCents,
+      currency: "BRL",
+      customer: {
+        id: customerIdAtual || dados.customerId || null,
+        name: dados.nome || undefined,
+        phone: phoneDigits || undefined,
+      },
+      metadata: {
+        source: "anne-tom-site",
+        orderTotal: totalFinal,
+        itemsCount: totalItens,
+        customerId: customerIdAtual || dados.customerId || null,
+      },
+    };
+  };
+
+  const createPixPayment = async ({ force = false, customerId } = {}) => {
+    if (pixPayment && !force) return pixPayment;
+
+    setPixError("");
+    setPixLoading(true);
+
+    if (!pixIdempotencyRef.current || force) {
+      pixIdempotencyRef.current =
+        typeof crypto !== "undefined" && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `pix-${Date.now()}-${Math.round(Math.random() * 1e6)}`;
+    }
+
+    try {
+      const requestPayload = buildPixPayload(customerId);
+      const res = await server.createPixPayment(
+        requestPayload,
+        pixIdempotencyRef.current
+      );
+      const data = await res.json();
+      const responsePayload = data?.transaction || data?.data || null;
+
+      if (!res.ok || !responsePayload) {
+        setPixError(
+          data?.message || "Nao foi possivel gerar o Pix agora."
+        );
+        return null;
+      }
+
+      const pixRaw =
+        responsePayload?.metadata?.pix?.raw ||
+        responsePayload?.metadata?.pix ||
+        responsePayload?.pix ||
+        responsePayload ||
+        null;
+
+      const nextPixPayment = {
+        transactionId:
+          responsePayload?.id || responsePayload?.transactionId || null,
+        providerReference: responsePayload?.providerReference || null,
+        status: responsePayload?.status || null,
+        amount: responsePayload?.amount || null,
+        amountCents: responsePayload?.amount_cents || null,
+        qrcode:
+          pixRaw?.qrcode ||
+          pixRaw?.qrCode ||
+          pixRaw?.qr_code ||
+          pixRaw?.pix_qr_code ||
+          null,
+        copiaColar:
+          pixRaw?.copia_colar ||
+          pixRaw?.copiaColar ||
+          pixRaw?.copyPaste ||
+          pixRaw?.pix_payload ||
+          null,
+        expiresAt: pixRaw?.expiresAt || pixRaw?.expires_at || null,
+        raw: pixRaw,
+      };
+
+      setPixPayment(nextPixPayment);
+      return nextPixPayment;
+    } catch (err) {
+      console.error("[useCheckout] pix error:", err);
+      setPixError("Nao foi possivel gerar o Pix agora.");
+      return null;
+    } finally {
+      setPixLoading(false);
     }
   };
 
@@ -529,11 +699,17 @@ export function useCheckout() {
 
   /* =========== NAVEGAÇÃO ENTRE ETAPAS =========== */
 
-  const avancar = () => setPasso((p) => Math.min(p + 1, 3));
+  const avancar = () =>
+    setPasso((p) => {
+      if (p === 0 && semItens) return p;
+      if (p === 1 && !podeAvancarDados) return p;
+      return Math.min(p + 1, 3);
+    });
   const voltar = () => setPasso((p) => Math.max(p - 1, 0));
   const irParaStep = (idx) =>
     setPasso((p) => {
       if (idx < 0 || idx > 3) return p;
+      if (idx > 0 && semItens) return p;
       return idx;
     });
 
@@ -560,6 +736,17 @@ export function useCheckout() {
         }
       }
 
+      let pixSnapshot = pixPayment;
+      if (pagamento === "pix") {
+        pixSnapshot = await createPixPayment({ customerId: customerIdAtual });
+        if (!pixSnapshot) {
+          return {
+            success: false,
+            error: "Falha ao gerar o Pix. Tente novamente.",
+          };
+        }
+      }
+
       // 2) monta dados completos pro resumo / API
       const payloadCliente = {
         ...dados,
@@ -572,7 +759,10 @@ export function useCheckout() {
       // 3) envia para desktop
       const desktopResult = await enviarParaDesktop(
         items,
-        payloadCliente,
+        {
+          ...payloadCliente,
+          pixPayment: pixSnapshot,
+        },
         totalFinal,
         pagamento
       );
@@ -614,6 +804,7 @@ export function useCheckout() {
         taxaEntrega,
         desconto,
         totalFinal,
+        pixPayment: pixSnapshot,
         dados: payloadCliente,
         waText: montarTextoWhatsApp(
           items,
@@ -701,6 +892,11 @@ export function useCheckout() {
     // pagamento
     pagamento,
     setPagamento,
+    pixPayment,
+    pixLoading,
+    pixError,
+    createPixPayment,
+    resetPixPayment,
 
     // totais
     subtotal,
@@ -715,6 +911,8 @@ export function useCheckout() {
     distanceKm,
     distanceFee,
     deliveryFeeLabel,
+    dadosValidos,
+    podeAvancarDados,
 
     // cart actions
     updateQuantity,

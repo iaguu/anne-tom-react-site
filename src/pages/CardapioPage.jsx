@@ -20,7 +20,8 @@ import React, {
 } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useCart } from "../context/CartContext";
-import { formatCurrencyBRL } from "../utils/menu";
+import server from "../api/server";
+import { formatCurrencyBRL, normalizeExtrasFromJson } from "../utils/menu";
 import { useMenuData } from "../hooks/useMenuData";
 import RetryBanner from "../components/ui/RetryBanner";
 import { useAppAccessInfo } from "../hooks/useAppAccess";
@@ -41,7 +42,186 @@ const OPENING_HOURS = {
 
 const FILTER_STORAGE_KEY = "anne_tom_cardapio_filters_v1";
 
-const OPENING_LABEL = "Terça a domingo das 19h às 23h (segunda fechado)";
+const OPENING_LABEL = "terca a domingo das 19h as 23h (segunda fechado)";
+
+const WEEKDAY_LABELS = [
+  "domingo",
+  "segunda",
+  "terca",
+  "quarta",
+  "quinta",
+  "sexta",
+  "sabado",
+];
+
+const formatDayList = (days) => {
+  const names = days
+    .map((day) => WEEKDAY_LABELS[day])
+    .filter(Boolean);
+  if (!names.length) return "";
+  if (names.length === 1) return names[0];
+  if (names.length === 2) return `${names[0]} e ${names[1]}`;
+  return `${names.slice(0, -1).join(", ")} e ${names[names.length - 1]}`;
+};
+
+const formatDayRanges = (days) => {
+  const sorted = Array.from(new Set(days))
+    .filter((day) => day >= 0 && day <= 6)
+    .sort((a, b) => a - b);
+
+  if (!sorted.length) return "";
+
+  const ranges = [];
+  let start = sorted[0];
+  let prev = sorted[0];
+
+  for (let i = 1; i < sorted.length; i += 1) {
+    if (sorted[i] === prev + 1) {
+      prev = sorted[i];
+      continue;
+    }
+    ranges.push([start, prev]);
+    start = sorted[i];
+    prev = sorted[i];
+  }
+
+  ranges.push([start, prev]);
+
+  return ranges
+    .map(([from, to]) =>
+      from === to
+        ? WEEKDAY_LABELS[from]
+        : `${WEEKDAY_LABELS[from]} a ${WEEKDAY_LABELS[to]}`
+    )
+    .join(" e ");
+};
+
+const formatOpenDaysLabel = (openDays, closedDays) => {
+  if (openDays.length === 7) return "todos os dias";
+
+  if (openDays.length === 6 && closedDays.length === 1) {
+    const closed = closedDays[0];
+    const start = (closed + 1) % 7;
+    const end = (closed + 6) % 7;
+    if (start === end) return WEEKDAY_LABELS[start];
+    return `${WEEKDAY_LABELS[start]} a ${WEEKDAY_LABELS[end]}`;
+  }
+
+  return formatDayRanges(openDays);
+};
+
+const normalizeSchedule = (businessHours) => {
+  if (!businessHours) return null;
+  const schedule = Array.isArray(businessHours.weeklySchedule)
+    ? businessHours.weeklySchedule
+    : null;
+  if (!schedule) return null;
+
+  const fallbackOpen = businessHours.openTime || "";
+  const fallbackClose = businessHours.closeTime || "";
+
+  return schedule
+    .map((entry) => {
+      const day = Number(entry.day);
+      if (!Number.isFinite(day)) return null;
+      return {
+        day,
+        enabled: entry.enabled !== false,
+        openTime: entry.openTime || fallbackOpen,
+        closeTime: entry.closeTime || fallbackClose,
+      };
+    })
+    .filter(Boolean);
+};
+
+const parseTimeToMinutes = (value) => {
+  if (!value || typeof value !== "string") return null;
+  const [rawH, rawM] = value.split(":");
+  const hour = Number(rawH);
+  const minute = Number(rawM);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+  return hour * 60 + minute;
+};
+
+const isBusinessOpenNow = (businessHours, now = new Date()) => {
+  if (!businessHours || businessHours.enabled === false) return true;
+
+  const schedule = normalizeSchedule(businessHours);
+  const weekday = now.getDay();
+  const scheduleEntry = schedule
+    ? schedule.find((entry) => entry.day === weekday)
+    : null;
+
+  if (scheduleEntry && scheduleEntry.enabled === false) return false;
+
+  const openTime =
+    scheduleEntry?.openTime || businessHours.openTime || "00:00";
+  const closeTime =
+    scheduleEntry?.closeTime || businessHours.closeTime || "23:59";
+
+  const openMinutes = parseTimeToMinutes(openTime);
+  const closeMinutes = parseTimeToMinutes(closeTime);
+  if (openMinutes == null || closeMinutes == null) return true;
+
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  if (closeMinutes <= openMinutes) {
+    return nowMinutes >= openMinutes || nowMinutes < closeMinutes;
+  }
+
+  return nowMinutes >= openMinutes && nowMinutes < closeMinutes;
+};
+
+const buildBusinessHoursLabel = (businessHours) => {
+  if (!businessHours) return OPENING_LABEL;
+  if (businessHours.enabled === false) {
+    return "horario livre (sem bloqueio no PDV)";
+  }
+
+  const schedule = normalizeSchedule(businessHours);
+  const closedDays = schedule
+    ? schedule.filter((entry) => entry.enabled === false).map((entry) => entry.day)
+    : Array.isArray(businessHours.closedWeekdays)
+    ? businessHours.closedWeekdays
+    : [];
+
+  const openDays = schedule
+    ? schedule.filter((entry) => entry.enabled !== false).map((entry) => entry.day)
+    : [0, 1, 2, 3, 4, 5, 6].filter(
+        (day) => !closedDays.includes(day)
+      );
+
+  if (!openDays.length) return "fechado todos os dias";
+
+  const closedLabel = closedDays.length
+    ? ` (${formatDayList(closedDays)} fechado)`
+    : "";
+
+  if (schedule) {
+    const groups = new Map();
+    schedule
+      .filter((entry) => entry.enabled !== false)
+      .forEach((entry) => {
+        const key = `${entry.openTime || ""}|${entry.closeTime || ""}`;
+        if (!groups.has(key)) {
+          groups.set(key, []);
+        }
+        groups.get(key).push(entry.day);
+      });
+
+    const parts = Array.from(groups.entries()).map(([key, days]) => {
+      const [open, close] = key.split("|");
+      const daysLabel = formatOpenDaysLabel(days, closedDays);
+      return `${daysLabel} das ${open} as ${close}`;
+    });
+
+    return `${parts.join(" | ")}${closedLabel}`;
+  }
+
+  const openLabel = formatOpenDaysLabel(openDays, closedDays);
+  const openTime = businessHours.openTime || "00:00";
+  const closeTime = businessHours.closeTime || "23:59";
+  return `${openLabel} das ${openTime} as ${closeTime}${closedLabel}`;
+};
 
 function isPizzariaOpen(now = new Date()) {
   const dow = now.getDay(); // 0-dom, 1-seg...
@@ -50,6 +230,111 @@ function isPizzariaOpen(now = new Date()) {
   const minutes = now.getHours() * 60 + now.getMinutes();
   return minutes >= rule.open && minutes < rule.close;
 }
+
+
+const toNumber = (value) => {
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? numberValue : null;
+};
+
+const resolveCents = (value) => {
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? numberValue / 100 : null;
+};
+
+const normalizeExtraItem = (item) => {
+  if (!item) return null;
+  if (typeof item === "string") {
+    const nome = item.trim();
+    if (!nome) return null;
+    return {
+      id: nome,
+      nome,
+      categoria: "",
+      descricao: "",
+      preco: null,
+      preco_broto: null,
+      preco_grande: null,
+    };
+  }
+
+  const nome =
+    item.nome ||
+    item.name ||
+    item.label ||
+    item.description ||
+    item.descricao ||
+    "";
+  const id =
+    item.id ||
+    item.code ||
+    item.codigo ||
+    item.slug ||
+    nome ||
+    "";
+  if (!id && !nome) return null;
+
+  return {
+    id: id ? String(id) : "",
+    nome,
+    categoria: item.categoria || item.category || "",
+    descricao: item.descricao || item.description || "",
+    preco: toNumber(
+      item.preco ??
+        item.price ??
+        item.valor ??
+        item.amount ??
+        resolveCents(
+          item.amount_cents ?? item.price_cents ?? item.preco_cents
+        )
+    ),
+    preco_broto: toNumber(item.preco_broto ?? item.priceBroto),
+    preco_grande: toNumber(item.preco_grande ?? item.priceGrande),
+  };
+};
+
+const resolveExtraId = (item) =>
+  item?.id ||
+  item?.code ||
+  item?.codigo ||
+  item?.slug ||
+  item?.nome ||
+  item?.name ||
+  "";
+
+const resolveExtraName = (item) =>
+  item?.nome ||
+  item?.name ||
+  item?.label ||
+  item?.description ||
+  item?.descricao ||
+  "Extra";
+
+const resolveExtraPrice = (item, tamanho) => {
+  if (!item) return 0;
+  const sizeValue =
+    tamanho === "broto"
+      ? toNumber(item.preco_broto ?? item.priceBroto)
+      : toNumber(item.preco_grande ?? item.priceGrande);
+  if (sizeValue != null) return sizeValue;
+
+  const baseValue = toNumber(
+    item.preco ?? item.price ?? item.valor ?? item.amount
+  );
+  if (baseValue != null) return baseValue;
+
+  return (
+    resolveCents(
+      item.amount_cents ?? item.price_cents ?? item.preco_cents
+    ) || 0
+  );
+};
+
+const isBordaExtra = (item) => {
+  const categoria = String(item?.categoria || "").toLowerCase();
+  const nome = String(item?.nome || "").toLowerCase();
+  return categoria.includes("borda") || nome.includes("borda");
+};
 
 // Abas por destaque / promoções / categorias especiais
 const BADGE_TABS = [
@@ -83,14 +368,37 @@ const CardapioPage = () => {
   const [categoria, setCategoria] = useState("todas");
   const [badgeFilter, setBadgeFilter] = useState("all");
   const [showBackToTop, setShowBackToTop] = useState(false);
-  // ---- Horário de funcionamento ----
-  const [isOpenNow, setIsOpenNow] = useState(isPizzariaOpen());
+  // ---- Horario de funcionamento (PDV/API) ----
+  const [businessHours, setBusinessHours] = useState(null);
+  const [businessStatus, setBusinessStatus] = useState(null);
+  const [businessHoursError, setBusinessHoursError] = useState("");
+  const [businessHoursLoading, setBusinessHoursLoading] = useState(false);
 
   const { isAppWebView, initialized: appInfoReady } = useAppAccessInfo();
   const [showAppToast, setShowAppToast] = useState(false);
 
-  const { pizzas, loadingMenu, menuError, isUsingCachedMenu, retry } =
-    useMenuData();
+  const {
+    menuData,
+    pizzas,
+    loadingMenu,
+    menuError,
+    isUsingCachedMenu,
+    retry,
+  } = useMenuData();
+
+  const extrasFromApi = useMemo(
+    () => normalizeExtrasFromJson(menuData),
+    [menuData]
+  );
+  const bordasDisponiveis = useMemo(
+    () => extrasFromApi.filter((item) => isBordaExtra(item)),
+    [extrasFromApi]
+  );
+  const ingredientesExtrasApi = useMemo(
+    () => extrasFromApi.filter((item) => !isBordaExtra(item)),
+    [extrasFromApi]
+  );
+  const hasGlobalExtras = ingredientesExtrasApi.length > 0;
 
   useEffect(() => {
     try {
@@ -118,10 +426,43 @@ const CardapioPage = () => {
   }, [categoria, badgeFilter, search]);
 
   useEffect(() => {
-    const update = () => setIsOpenNow(isPizzariaOpen());
-    update();
-    const interval = setInterval(update, 60_000);
-    return () => clearInterval(interval);
+    let cancelled = false;
+
+    const fetchBusinessHours = async () => {
+      try {
+        setBusinessHoursLoading(true);
+        setBusinessHoursError("");
+
+        const response = await server.fetchBusinessHours();
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        const payload = await response.json();
+        if (cancelled) return;
+
+        setBusinessHours(
+          payload?.businessHours || payload?.settings?.businessHours || null
+        );
+        setBusinessStatus(payload?.status || payload?.businessStatus || null);
+      } catch (err) {
+        if (cancelled) return;
+        console.error("[Cardapio] erro ao buscar horario PDV:", err);
+        setBusinessHoursError(
+          "Nao foi possivel atualizar o horario do PDV."
+        );
+      } finally {
+        if (!cancelled) setBusinessHoursLoading(false);
+      }
+    };
+
+    fetchBusinessHours();
+    const interval = setInterval(fetchBusinessHours, 60_000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, []);
 
   useEffect(() => {
@@ -149,6 +490,7 @@ const CardapioPage = () => {
   const [isMeioMeio, setIsMeioMeio] = useState(false);
   const [meioId, setMeioId] = useState("");
   const [extrasSelecionados, setExtrasSelecionados] = useState([]);
+  const [bordaSelecionada, setBordaSelecionada] = useState(null);
   const [obsPizza, setObsPizza] = useState("");
   const [focusExtras, setFocusExtras] = useState(false);
   const [extrasOpen, setExtrasOpen] = useState(false);
@@ -156,11 +498,24 @@ const CardapioPage = () => {
 
   const [highlightedPizzaId, setHighlightedPizzaId] = useState(null);
 
+  const openingLabel = buildBusinessHoursLabel(businessHours);
+  const closedReason = businessStatus?.reason || "";
+  const apiOpen =
+    typeof businessStatus?.isOpen === "boolean"
+      ? businessStatus.isOpen
+      : null;
+  const isOpenNow =
+    apiOpen != null
+      ? apiOpen
+      : businessHours
+      ? isBusinessOpenNow(businessHours)
+      : isPizzariaOpen();
+
   // helper: impede adicionar se estiver fechado
   const ensureOpenOrWarn = () => {
     if (isOpenNow) return true;
     alert(
-      `A Pizzaria Anne & Tom está fechada agora.\n\nHorário de funcionamento: ${OPENING_LABEL}.`
+      `A Pizzaria Anne & Tom esta fechada agora.\n\nHorario de funcionamento: ${openingLabel}.${closedReason ? `\n\n${closedReason}` : ""}`
     );
     return false;
   };
@@ -228,14 +583,33 @@ const CardapioPage = () => {
     precoUnitario = Math.max(precoBase, precoMeio);
   }
 
-  // Preço extras
-  const extrasDaPizza = selectedPizza?.extras || [];
-  const extrasTotais = extrasDaPizza
-    .filter((e) => extrasSelecionados.includes(e.id))
-    .reduce((acc, e) => acc + (Number(e.preco) || 0), 0);
+
+  const extrasDisponiveis = useMemo(() => {
+    if (!selectedPizza) return [];
+    if (Array.isArray(selectedPizza.extras) && selectedPizza.extras.length > 0) {
+      return selectedPizza.extras.map(normalizeExtraItem).filter(Boolean);
+    }
+    return ingredientesExtrasApi;
+  }, [selectedPizza, ingredientesExtrasApi]);
+
+  const extrasTotais = extrasDisponiveis
+    .filter((extra) =>
+      extrasSelecionados.includes(
+        resolveExtraId(extra) || resolveExtraName(extra)
+      )
+    )
+    .reduce(
+      (acc, extra) => acc + resolveExtraPrice(extra, tamanho),
+      0
+    );
+
+  const bordaPreco = bordaSelecionada
+    ? resolveExtraPrice(bordaSelecionada, tamanho)
+    : 0;
 
   // Total
-  const precoTotal = (precoUnitario + extrasTotais) * quantidade;
+  const precoTotal =
+    (precoUnitario + extrasTotais + bordaPreco) * quantidade;
 
   const abrirModal = (pizza, options = {}) => {
     if (options.highlight) {
@@ -251,6 +625,7 @@ const CardapioPage = () => {
     setIsMeioMeio(false);
     setMeioId("");
     setExtrasSelecionados([]);
+    setBordaSelecionada(null);
     setObsPizza("");
   };
 
@@ -355,18 +730,28 @@ const CardapioPage = () => {
     if (isMeioMeio && meioPizza)
       nomeFinal = `${selectedPizza.nome} / ${meioPizza.nome}`;
 
-    const extrasNomes = extrasDaPizza
-      .filter((e) => extrasSelecionados.includes(e.id))
-      .map((e) => e.nome);
+    const extrasNomes = extrasDisponiveis
+      .filter((extra) =>
+        extrasSelecionados.includes(
+          resolveExtraId(extra) || resolveExtraName(extra)
+        )
+      )
+      .map((extra) => resolveExtraName(extra));
+
+    const bordaNome = bordaSelecionada
+      ? resolveExtraName(bordaSelecionada)
+      : null;
 
     addItem({
       id: `pizza-${selectedPizza.id}-${Date.now()}`,
+      idPizza: selectedPizza.id,
       nome: nomeFinal,
       tamanho,
       quantidade,
-      precoUnitario: precoUnitario + extrasTotais,
+      precoUnitario: precoUnitario + extrasTotais + bordaPreco,
       meio: meioPizza?.nome || null,
       extras: extrasNomes,
+      borda: bordaNome,
       obsPizza: obsPizza.trim() || null,
     });
 
@@ -431,7 +816,17 @@ const CardapioPage = () => {
             <span className="px-2 py-1 rounded-full bg-slate-900 text-white text-[11px] uppercase tracking-wide">
               {isOpenNow ? "Aberto agora" : "Fechado no momento"}
             </span>
-            <span className="text-slate-600">{OPENING_LABEL}</span>
+            <span className="text-slate-600">{openingLabel}</span>
+            {businessHoursLoading && (
+              <span className="text-[11px] text-slate-400">
+                Atualizando horario...
+              </span>
+            )}
+            {businessHoursError && (
+              <span className="text-[11px] text-amber-600">
+                {businessHoursError}
+              </span>
+            )}
             {isUsingCachedMenu && (
               <span className="text-[11px] text-amber-600">
                 (Usando cardápio salvo no dispositivo)
@@ -555,7 +950,7 @@ const CardapioPage = () => {
 
                     {/* BADGES */}
                     <div className="flex gap-1 flex-wrap mt-2">
-                      {pizza.extras?.length > 0 && (
+                      {(pizza.extras?.length > 0 || hasGlobalExtras) && (
                         <button
                           type="button"
                           onClick={(event) => {
@@ -738,8 +1133,61 @@ const CardapioPage = () => {
                   )}
                 </div>
 
+                {/* BORDA */}
+                {bordasDisponiveis.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">
+                      Borda recheada
+                    </p>
+                    <div className="space-y-2">
+                      <label className="flex items-center justify-between px-3 py-2 border border-slate-300 bg-white rounded-xl text-sm">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            name={`borda-${selectedPizza.id}`}
+                            checked={!bordaSelecionada}
+                            onChange={() => setBordaSelecionada(null)}
+                          />
+                          <span>Sem borda</span>
+                        </div>
+                        <span className="text-slate-500">R$ 0,00</span>
+                      </label>
+                      {bordasDisponiveis.map((borda) => {
+                        const bordaId =
+                          resolveExtraId(borda) || resolveExtraName(borda);
+                        const bordaNome = resolveExtraName(borda);
+                        const bordaPrecoAtual = resolveExtraPrice(
+                          borda,
+                          tamanho
+                        );
+                        const bordaSelecionadaId = resolveExtraId(
+                          bordaSelecionada
+                        );
+
+                        return (
+                          <label
+                            key={bordaId}
+                            className="flex items-center justify-between px-3 py-2 border border-slate-300 bg-white rounded-xl text-sm"
+                          >
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="radio"
+                                name={`borda-${selectedPizza.id}`}
+                                checked={bordaSelecionadaId === bordaId}
+                                onChange={() => setBordaSelecionada(borda)}
+                              />
+                              <span>{bordaNome}</span>
+                            </div>
+                            <span>+ {formatCurrencyBRL(bordaPrecoAtual)}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 {/* EXTRAS */}
-                {selectedPizza.extras?.length > 0 && (
+                {extrasDisponiveis.length > 0 && (
                   <div className="space-y-2">
                     <button
                       type="button"
@@ -758,33 +1206,35 @@ const CardapioPage = () => {
                           Adicionais
                         </p>
 
-                        {selectedPizza.extras.map((ext) => (
-                          <label
-                            key={ext.id}
-                            className="flex items-center justify-between px-3 py-2 border border-slate-300 bg-white rounded-xl text-sm"
-                          >
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="checkbox"
-                                checked={extrasSelecionados.includes(ext.id)}
-                                onChange={() => {
-                                  setExtrasSelecionados((prev) =>
-                                    prev.includes(ext.id)
-                                      ? prev.filter((x) => x !== ext.id)
-                                      : [...prev, ext.id]
-                                  );
-                                }}
-                              />
-                              <span>{ext.nome}</span>
-                            </div>
-                            <span>
-                              +{" "}
-                              {formatCurrencyBRL(
-                                ext.preco ?? ext.price ?? 0
-                              )}
-                            </span>
-                          </label>
-                        ))}
+                        {extrasDisponiveis.map((ext) => {
+                          const extraId =
+                            resolveExtraId(ext) || resolveExtraName(ext);
+                          const extraNome = resolveExtraName(ext);
+                          const extraPreco = resolveExtraPrice(ext, tamanho);
+
+                          return (
+                            <label
+                              key={extraId}
+                              className="flex items-center justify-between px-3 py-2 border border-slate-300 bg-white rounded-xl text-sm"
+                            >
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  checked={extrasSelecionados.includes(extraId)}
+                                  onChange={() => {
+                                    setExtrasSelecionados((prev) =>
+                                      prev.includes(extraId)
+                                        ? prev.filter((x) => x !== extraId)
+                                        : [...prev, extraId]
+                                    );
+                                  }}
+                                />
+                                <span>{extraNome}</span>
+                              </div>
+                              <span>+ {formatCurrencyBRL(extraPreco)}</span>
+                            </label>
+                          );
+                        })}
                       </div>
                     )}
                   </div>

@@ -14,6 +14,11 @@ import SiteFooter from "../components/layout/SiteFooter";
 
 const PIZZA_IMAGE_SRC =
   "https://recipesblob.oetker.com.br/assets/fa238f6f683d4e8aa6260db042e82f73/1272x764/pizza-caseira-lucas-alencar.webp";
+const AVATAR_IMAGES = [
+  "https://i.pravatar.cc/80?img=32",
+  "https://i.pravatar.cc/80?img=12",
+  "https://i.pravatar.cc/80?img=56",
+];
 
 
 
@@ -40,7 +45,7 @@ const HomeAnneTom = () => {
   const [imageLoaded, setImageLoaded] = useState(false);
 
   const { pizzas, loadingMenu, menuError, retry } = useMenuData();
-  const { isAppWebView, isMobileBrowser, initialized } = useAppAccessInfo();
+  const { isAppWebView, initialized } = useAppAccessInfo();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -76,29 +81,7 @@ const HomeAnneTom = () => {
     return veggie.slice(0, 3);
   }, [pizzas]);
 
-  const heroHighlights = useMemo(() => {
-    if (HOME_MENU_OVERRIDES.heroHighlights.length) {
-      return HOME_MENU_OVERRIDES.heroHighlights;
-    }
-    const highlights = [];
-    if (bestSellerItems[0]) {
-      highlights.push(`Mais pedidos: ${bestSellerItems[0].nome}`);
-    }
-    if (veggieItems[0]) {
-      highlights.push(`Veggie em destaque: ${veggieItems[0].nome}`);
-    }
-    const newItem = pizzas.find((pizza) => (pizza.badges || []).includes("new"));
-    if (newItem) {
-      highlights.push(`Novidade: ${newItem.nome}`);
-    }
-    const promoItem = pizzas.find((pizza) => (pizza.badges || []).includes("promo"));
-    if (promoItem) {
-      highlights.push(`Promo: ${promoItem.nome}`);
-    }
-    return highlights.slice(0, 4);
-  }, [bestSellerItems, veggieItems, pizzas]);
-
-  const showDownloadAppSection = !isAppWebView && isMobileBrowser;
+  const showDownloadAppSection = !isAppWebView;
 
 
 
@@ -115,7 +98,7 @@ const HomeAnneTom = () => {
 
         <main className="pt-16 sm:pt-18">
 
-        <Hero imageLoaded={imageLoaded} setImageLoaded={setImageLoaded} highlights={heroHighlights} />
+        <Hero imageLoaded={imageLoaded} setImageLoaded={setImageLoaded} />
 
         {menuError && <RetryBanner message={menuError} onRetry={retry} />}
 
@@ -594,7 +577,7 @@ const Header = ({ scrolled }) => {
 
 /* HERO -------------------------------------------------------------- */
 
-const Hero = ({ imageLoaded, setImageLoaded, highlights = [] }) => (
+const Hero = ({ imageLoaded, setImageLoaded }) => (
 
   <section className="home-hero">
     <div className="home-hero-glow" aria-hidden="true" />
@@ -646,7 +629,7 @@ const Hero = ({ imageLoaded, setImageLoaded, highlights = [] }) => (
 
 
 
-        <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:flex-wrap">
+        <div className="home-hero-actions flex flex-col gap-3 pt-2 sm:flex-row sm:flex-wrap">
 
           <Link
 
@@ -680,38 +663,42 @@ const Hero = ({ imageLoaded, setImageLoaded, highlights = [] }) => (
 
         </div>
 
-
-
         {/* PROVA SOCIAL */}
 
-        <div className="flex items-center gap-4 pt-3">
-
-          <div className="flex -space-x-2">
-
-            <AvatarBubble />
-
-            <AvatarBubble shade="400" />
-
-            <AvatarBubble shade="500" />
-
-          </div>
-
-        <div className="flex justify-center mt-6">
-          <div className="relative w-full max-w-3xl rounded-3xl border border-slate-200 bg-gradient-to-r from-white via-slate-50 to-slate-100 px-6 py-6 text-center shadow-lg">
-            <div className="absolute -left-6 top-1/2 -translate-y-1/2 hidden rounded-full border border-amber-200 bg-white/80 p-4 shadow-sm md:block">
-              <span className="text-amber-400 text-xl">★</span>
+        <div className="home-hero-proof">
+          <div className="home-hero-proof-top">
+            <div className="flex -space-x-2">
+              <AvatarBubble src={AVATAR_IMAGES[0]} alt="Cliente Anne & Tom" />
+              <AvatarBubble src={AVATAR_IMAGES[1]} alt="Cliente Anne & Tom" />
+              <AvatarBubble src={AVATAR_IMAGES[2]} alt="Cliente Anne & Tom" />
             </div>
-            <p className="text-[13px] md:text-[14px] font-semibold uppercase tracking-[0.3em] text-slate-900">
-              Mais de 15 mil pedidos entregues na Zona Norte
+            <div>
+              <p className="text-xs font-semibold text-slate-800">
+                15k+ pedidos entregues
+              </p>
+              <p className="text-[11px] text-slate-500">
+                <span className="home-hero-star" aria-hidden="true">
+                  ★
+                </span>{" "}
+                4.9 em avaliacoes e clientes fieis
+              </p>
+            </div>
+          </div>
+
+          <div className="home-hero-proof-card">
+            <div className="home-hero-proof-badge" aria-hidden="true">
+              <span className="home-hero-star">★</span>
+              <span>5/5</span>
+            </div>
+            <p className="text-[12px] sm:text-[13px] font-semibold uppercase tracking-[0.3em] text-slate-900">
+              Mais de 15 mil pedidos na Zona Norte
             </p>
-            <p className="mt-2 text-[14px] leading-relaxed text-slate-600">
-              Desde 2019, destacando-se como uma das pizzarias mais elogiadas com
-              massa leve, ingredientes frescos e atendimento genuíno de bairro.
+            <p className="mt-2 text-[13px] leading-relaxed text-slate-600">
+              Desde 2019, massa leve, ingredientes frescos e atendimento de bairro.
             </p>
           </div>
         </div>
 
-        </div>
 
       </div>
 
@@ -1415,42 +1402,55 @@ const APP_DOWNLOAD_WHATSAPP =
   "https://api.whatsapp.com/send?phone=5511932507007&text=Quero%20baixar%20o%20app%20Anne%20%26%20Tom";
 
 const DownloadAppSection = () => (
-  <section className="mx-4 lg:mx-0">
-    <div className="home-cta-panel max-w-6xl mx-auto transform rounded-3xl border border-slate-800 bg-slate-900 px-6 py-10 text-white shadow-2xl shadow-slate-900/30">
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.4em] text-amber-300">
-            App oficial
-          </p>
-          <h3 className="text-2xl font-black tracking-tight">
-            Experiência ainda mais rápida no celular
-          </h3>
-          <p className="text-sm text-slate-300">
-            Baixe o app da Anne &amp; Tom para receber notificações, salvar favoritos e abrir o cardápio com um toque sem carregar o site inteiro.
-          </p>
-        </div>
-        <div className="grid w-full gap-3 sm:grid-cols-2">
+  <section className="home-app">
+    <div className="home-app-inner max-w-6xl mx-auto px-4 lg:px-6">
+      <div className="home-app-copy">
+        <p className="home-app-eyebrow">APP OFICIAL</p>
+        <h3 className="home-app-title">Baixe o app e peca mais rapido</h3>
+        <p className="home-app-text">
+          Receba avisos, salve favoritos e abra o cardapio com um toque. O link
+          chega no WhatsApp e a instalacao e rapida.
+        </p>
+        <div className="home-app-actions">
           <a
             href={`${APP_DOWNLOAD_WHATSAPP}&text=Quero%20o%20link%20do%20app%20Android`}
             target="_blank"
             rel="noreferrer"
-            className="rounded-full border border-white/30 bg-white/10 px-5 py-3 text-center text-sm font-semibold text-white transition hover:bg-white/20"
+            className="home-app-store"
           >
-            Android (Beta)
+            Android (beta)
           </a>
           <a
             href={`${APP_DOWNLOAD_WHATSAPP}&text=Quero%20o%20link%20do%20app%20iOS`}
             target="_blank"
             rel="noreferrer"
-            className="rounded-full border border-white/30 bg-white/10 px-5 py-3 text-center text-sm font-semibold text-white transition hover:bg-white/20"
+            className="home-app-store home-app-store--ghost"
           >
             iOS (em breve)
           </a>
         </div>
+        <p className="home-app-note">Receba o link no WhatsApp em segundos.</p>
       </div>
-      <p className="mt-4 text-xs text-slate-400">
-        Receba o link no WhatsApp e confirme sua instalação em segundos.
-      </p>
+      <div className="home-app-cards">
+        <div className="home-app-phone">
+          <div className="home-app-phone-notch" />
+          <p className="home-app-phone-title">Anne & Tom App</p>
+          <ul className="home-app-phone-list">
+            <li>Cardapio salvo</li>
+            <li>Repetir pedido</li>
+            <li>Tempo de entrega</li>
+          </ul>
+          <span className="home-app-phone-tag">Instalacao rapida</span>
+        </div>
+        <div className="home-app-benefits">
+          <p className="home-app-benefits-title">No app voce tem</p>
+          <ul className="home-app-benefits-list">
+            <li>Checkout mais rapido</li>
+            <li>Favoritos sempre prontos</li>
+            <li>Atalhos para WhatsApp</li>
+          </ul>
+        </div>
+      </div>
     </div>
   </section>
 );
@@ -1634,6 +1634,272 @@ const styles = `
     from { opacity: 0; transform: scale(1.02); }
     to   { opacity: 1; transform: scale(1); }
   }
+
+  
+
+  .home-hero-actions {
+    gap: 0.75rem;
+  }
+
+  .home-hero-highlights {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+  }
+
+  .home-hero-highlight {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.4rem 0.7rem;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    border: 1px solid rgba(240, 122, 63, 0.35);
+    color: #4b2f1f;
+    background: linear-gradient(135deg, rgba(240, 122, 63, 0.16), rgba(255, 255, 255, 0.92));
+  }
+
+  .home-hero-proof {
+    display: grid;
+    gap: 0.9rem;
+    margin-top: 0.6rem;
+  }
+
+  .home-hero-proof-top {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .home-hero-proof-card {
+    position: relative;
+    border-radius: 28px;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    background: linear-gradient(120deg, #ffffff 0%, #f8fafc 40%, #f1f5f9 100%);
+    padding: 1.25rem 1.5rem;
+    box-shadow: 0 20px 45px -35px rgba(15, 23, 42, 0.5);
+    text-align: center;
+  }
+
+  .home-hero-proof-badge {
+    position: absolute;
+    top: -14px;
+    right: 18px;
+    border-radius: 999px;
+    border: 1px solid rgba(240, 122, 63, 0.4);
+    background: #fff;
+    padding: 0.25rem 0.6rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #c94227;
+    box-shadow: 0 8px 18px -12px rgba(15, 23, 42, 0.5);
+  }
+
+  
+  .home-app {
+    position: relative;
+    overflow: hidden;
+    padding: 2.5rem 0;
+    background: linear-gradient(180deg, #ffffff 0%, #f8f6f2 55%, #f2f2ef 100%);
+    color: #0f172a;
+  }
+
+  .home-app::before {
+    content: "";
+    position: absolute;
+    inset: -50% 30% auto;
+    height: 220%;
+    background: radial-gradient(circle at 40% 30%, rgba(245, 158, 11, 0.2), transparent 68%);
+    pointer-events: none;
+  }
+
+  .home-app-inner {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 2.5rem;
+    align-items: center;
+  }
+
+  .home-app-copy {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .home-app-eyebrow {
+    font-size: 0.65rem;
+    letter-spacing: 0.45em;
+    text-transform: uppercase;
+    color: #b45309;
+    font-weight: 700;
+  }
+
+  .home-app-title {
+    font-size: 2rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: #0f172a;
+  }
+
+  .home-app-text {
+    font-size: 0.95rem;
+    color: #475569;
+  }
+
+  .home-app-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+  }
+
+  .home-app-store {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.85rem 1rem;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #f59e0b, #f97316);
+    color: #1f2937;
+    font-weight: 700;
+    text-decoration: none;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: 0 18px 30px -20px rgba(15, 23, 42, 0.35);
+  }
+
+  .home-app-store:hover {
+    transform: translateY(-1px);
+  }
+
+  .home-app-store--ghost {
+    background: #ffffff;
+    border: 1px solid rgba(148, 163, 184, 0.45);
+    color: #0f172a;
+    box-shadow: none;
+  }
+
+  .home-app-note {
+    font-size: 0.75rem;
+    color: #64748b;
+  }
+
+  .home-app-cards {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .home-app-phone {
+    position: relative;
+    padding: 1.25rem;
+    border-radius: 24px;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    background: #ffffff;
+    box-shadow: 0 24px 40px -32px rgba(15, 23, 42, 0.35);
+    color: #0f172a;
+  }
+
+  .home-app-phone-notch {
+    width: 64px;
+    height: 6px;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.15);
+    margin: 0 auto 0.9rem;
+  }
+
+  .home-app-phone-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #0f172a;
+  }
+
+  .home-app-phone-list {
+    margin-top: 0.75rem;
+    display: grid;
+    gap: 0.4rem;
+    font-size: 0.8rem;
+    color: #475569;
+  }
+
+  .home-app-phone-tag {
+    display: inline-flex;
+    margin-top: 0.75rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #92400e;
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    background: rgba(245, 158, 11, 0.18);
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+  }
+
+  .home-app-benefits {
+    border-radius: 20px;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    background: #fff9f1;
+    padding: 1rem 1.25rem;
+    color: #0f172a;
+  }
+
+  .home-app-benefits-title {
+    font-size: 0.85rem;
+    font-weight: 700;
+  }
+
+  .home-app-benefits-list {
+    margin-top: 0.6rem;
+    display: grid;
+    gap: 0.35rem;
+    font-size: 0.78rem;
+    color: #475569;
+  }
+
+  @media (max-width: 900px) {
+    .home-app-inner {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .home-hero-inner {
+      padding-top: 2.5rem;
+      padding-bottom: 3rem;
+      gap: 1.5rem;
+    }
+
+    .home-hero h1 {
+      font-size: 2.35rem;
+      line-height: 1.08;
+    }
+
+    .home-hero p {
+      font-size: 0.98rem;
+    }
+
+    .home-hero-actions a {
+      width: 100%;
+    }
+
+    .home-hero-highlights {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.6rem;
+    }
+
+    .home-hero-proof-card {
+      text-align: left;
+      padding: 1rem 1.2rem;
+    }
+
+    .home-hero-proof-badge {
+      right: 12px;
+    }
+
+    .home-app-actions {
+      grid-template-columns: 1fr;
+    }
+  }
+
 
   @media (prefers-reduced-motion: reduce) {
     .animate-page-in,

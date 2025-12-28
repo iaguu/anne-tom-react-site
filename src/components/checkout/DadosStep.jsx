@@ -1,7 +1,5 @@
 // src/components/checkout/DadosStep.jsx
 import React from "react";
-import { getTaxaPorBairro } from "../../utils/deliveryFees";
-
 const DadosStep = ({
   dados,
   setDados,
@@ -23,7 +21,11 @@ const DadosStep = ({
   distanceFee,
   deliveryFeeLabel,
 }) => {
-  const taxaBairro = dados.retirada ? 0 : getTaxaPorBairro(dados.bairro);
+  const showDistancePending =
+    !dados.retirada &&
+    distanceFee == null &&
+    !deliveryEtaLoading &&
+    !deliveryEtaError;
 
   const getPhoneDigits = (value) => value.replace(/\D/g, "").slice(0, 11);
 
@@ -231,14 +233,10 @@ React.useEffect(() => {
                     </strong>
                   </p>
                 )}
-                {!dados.retirada && distanceFee == null && (
-                  <p className="mt-1 text-[11px] text-slate-600">
-                    Taxa de entrega:{" "}
-                    <strong>
-                      R${" "}
-                      {taxaBairro.toFixed(2).replace(".", ",")}
-                    </strong>{" "}
-                    (calculada automaticamente pelo CEP).
+                {showDistancePending && (
+                  <p className="mt-1 text-[11px] text-amber-700">
+                    Taxa por distancia ainda nao calculada. Confira o
+                    endereco e o CEP para liberar a entrega.
                   </p>
                 )}
                 {!dados.retirada && (

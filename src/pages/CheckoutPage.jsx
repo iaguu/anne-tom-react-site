@@ -49,6 +49,10 @@ const CheckoutPage = () => {
     // pagamento
     pagamento,
     setPagamento,
+    pixPayment,
+    pixLoading,
+    pixError,
+    createPixPayment,
 
     // totais
     subtotal,
@@ -62,6 +66,7 @@ const CheckoutPage = () => {
     deliveryEtaError,
     distanceFee,
     deliveryFeeLabel,
+    podeAvancarDados,
 
     // cart actions
     updateQuantity,
@@ -272,6 +277,10 @@ const CheckoutPage = () => {
                 totalFinal={totalFinal}
                 pagamento={pagamento}
                 setPagamento={setPagamento}
+                pixPayment={pixPayment}
+                pixLoading={pixLoading}
+                pixError={pixError}
+                onCreatePix={createPixPayment}
               />
             )}
 
@@ -290,7 +299,16 @@ const CheckoutPage = () => {
               {passo < 2 && (
                 <button
                   onClick={avancar}
-                  className="premium-button px-6 py-2 text-xs font-semibold"
+                  disabled={
+                    (passo === 0 && totalItens === 0) ||
+                    (passo === 1 && !podeAvancarDados)
+                  }
+                  className={`premium-button px-6 py-2 text-xs font-semibold ${
+                    (passo === 0 && totalItens === 0) ||
+                    (passo === 1 && !podeAvancarDados)
+                      ? "opacity-60 cursor-not-allowed"
+                      : ""
+                  }`}
                 >
                   Avançar →
                   {passo === 0 && totalItens > 0 && (

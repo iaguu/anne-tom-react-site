@@ -87,6 +87,7 @@ const OrderConfirmationPage = () => {
   const [confirmingDelivery, setConfirmingDelivery] = useState(false);
   const [confirmError, setConfirmError] = useState("");
   const [deliveryConfirmed, setDeliveryConfirmed] = useState(false);
+  const [pixCopied, setPixCopied] = useState(false);
 
   // -------------------------------------------------------------------
   // 1) Resolver resumo + trackingId (URL + state + localStorage)
@@ -171,6 +172,10 @@ const OrderConfirmationPage = () => {
         (acc, item) => acc + Number(item.quantidade || 0),
         0
       );
+  const pixInfo =
+    resumo?.pixPayment || resumo?.dados?.pixPayment || null;
+  const pixCode = pixInfo?.copiaColar || pixInfo?.qrcode || "";
+  const pixExpiresAt = pixInfo?.expiresAt || "";
 
   // Número amigável exibido (#92336)
   const codigoPedido =
@@ -200,6 +205,16 @@ const OrderConfirmationPage = () => {
   const statusLabel = statusLabelForCustomer(effectiveStatus);
   const etaText = etaTextForStatus(effectiveStatus, bairroResumo);
 
+  const formatPixExpiresAt = (value) => {
+    if (!value) return "";
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return value;
+    return parsed.toLocaleString();
+  };
+
+  const pixCopyLabel = pixCopied ? "Codigo copiado" : "Copiar codigo";
+  const pixExpiresLabel = pixExpiresAt ? formatPixExpiresAt(pixExpiresAt) : "";
+
   const motoboySnapshot =
     trackingData?.motoboySnapshot ||
     trackingData?.delivery?.motoboySnapshot ||
@@ -216,6 +231,17 @@ const OrderConfirmationPage = () => {
         phone: trackingData.motoboyPhone || null,
       }
     : null;
+
+  const handleCopyPix = async () => {
+    if (!pixCode || !navigator?.clipboard) return;
+    try {
+      await navigator.clipboard.writeText(pixCode);
+      setPixCopied(true);
+      window.setTimeout(() => setPixCopied(false), 2000);
+    } catch (_err) {
+      setPixCopied(false);
+    }
+  };
 
   // -------------------------------------------------------------------
   // 2) Polling em tempo real – agora lendo data.items[0] ou data.order
@@ -601,6 +627,36 @@ const OrderConfirmationPage = () => {
                     </span>
                   </p>
                 </div>
+
+                {pixCode && (
+                  <div className="mt-3 rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-xs space-y-2">
+                    <p className="font-semibold text-slate-800">
+                      Pix copia e cola
+                    </p>
+                    <p className="text-[11px] text-slate-500">
+                      Use o codigo abaixo para pagar no seu banco.
+                    </p>
+                    <textarea
+                      readOnly
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px]"
+                      value={pixCode}
+                    />
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={handleCopyPix}
+                        className="premium-button-ghost px-3 py-2 text-[11px]"
+                      >
+                        {pixCopyLabel}
+                      </button>
+                      {pixExpiresLabel && (
+                        <span className="text-[11px] text-slate-500">
+                          Valido ate: {pixExpiresLabel}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3 text-[11px] text-slate-500 space-y-1">

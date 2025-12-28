@@ -1,4 +1,4 @@
-// src/utils/menu.js
+ï»¿// src/utils/menu.js
 export const MENU_CACHE_KEY = "anne_tom_menu_cache_v1";
 
 export const formatCurrencyBRL = (value) =>
@@ -52,7 +52,7 @@ export const normalizeBadgesFromItem = (item) => {
   }
 
   const hasMeat =
-    /calabresa|bacon|frango|carne|presunto|lombo|lingui[cç]a|peru|pepperoni|mignon|costela|salmao|camarao|atum|anchov|peixe|pernil/i.test(
+    /calabresa|bacon|frango|carne|presunto|lombo|linguica|peru|pepperoni|mignon|costela|salmao|camarao|atum|anchov|peixe|pernil/i.test(
       text
     );
 
@@ -77,14 +77,16 @@ export const normalizeBadgesFromItem = (item) => {
   return Array.from(badgesSet);
 };
 
-export const normalizePizzasFromJson = (json) => {
-  let items = [];
+const extractMenuItems = (json) => {
+  if (!json) return [];
+  if (Array.isArray(json)) return json;
+  if (Array.isArray(json.products)) return json.products;
+  if (Array.isArray(json.items)) return json.items;
+  return [];
+};
 
-  if (!json) items = [];
-  else if (Array.isArray(json)) items = json;
-  else if (Array.isArray(json.products)) items = json.products;
-  else if (Array.isArray(json.items)) items = json.items;
-  else items = [];
+export const normalizePizzasFromJson = (json) => {
+  const items = extractMenuItems(json);
 
   const safeNumber = (value) => {
     const numberValue = Number(value);
@@ -124,4 +126,66 @@ export const normalizePizzasFromJson = (json) => {
         sugestoes: Array.isArray(item.sugestoes) ? item.sugestoes : [],
       };
     });
+};
+
+export const normalizeExtrasFromJson = (json) => {
+  const items = extractMenuItems(json);
+
+  const safeNumber = (value) => {
+    const numberValue = Number(value);
+    return Number.isFinite(numberValue) ? numberValue : null;
+  };
+
+  const resolveCents = (value) => {
+    const numberValue = Number(value);
+    return Number.isFinite(numberValue) ? numberValue / 100 : null;
+  };
+
+  return items
+    .filter((item) => {
+      if (item.active === false) return false;
+      if (item.isAvailable === false) return false;
+
+      const type = String(item.type || item.tipo || "").toLowerCase();
+      const categoria = String(item.category || item.categoria || "").toLowerCase();
+
+      if (type === "pizza") return false;
+      if (type === "extra") return true;
+
+      return (
+        categoria.includes("borda") ||
+        categoria.includes("extra") ||
+        categoria.includes("adicional") ||
+        categoria.includes("ingrediente")
+      );
+    })
+    .map((item) => {
+      const id =
+        item.id ||
+        item.code ||
+        item.codigo ||
+        item.slug ||
+        item.name ||
+        item.nome ||
+        "";
+
+      return {
+        id: id ? String(id) : "",
+        nome: item.name || item.nome || "",
+        categoria: item.category || item.categoria || "",
+        descricao: item.description || item.descricao || "",
+        preco: safeNumber(
+          item.price ??
+            item.preco ??
+            item.valor ??
+            item.amount ??
+            resolveCents(
+              item.amount_cents ?? item.price_cents ?? item.preco_cents
+            )
+        ),
+        preco_broto: safeNumber(item.priceBroto ?? item.preco_broto),
+        preco_grande: safeNumber(item.priceGrande ?? item.preco_grande),
+      };
+    })
+    .filter((item) => item.id || item.nome);
 };
