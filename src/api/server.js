@@ -6,23 +6,11 @@ const runtimeConfig =
     : undefined;
 const apiKey = process.env.REACT_APP_AT_API_KEY;
 const publicToken = process.env.REACT_APP_PUBLIC_API_TOKEN;
-const axionApiKey =
-  process.env.REACT_APP_AXIONPAY_API_KEY ||
-  process.env.REACT_APP_AXION_PAY_API_KEY ||
-  runtimeConfig?.axionPayApiKey ||
-  runtimeConfig?.axionpayApiKey;
-const axionBearer =
-  process.env.REACT_APP_AXIONPAY_BEARER ||
-  process.env.REACT_APP_AXION_PAY_BEARER ||
-  runtimeConfig?.axionPayBearer ||
-  runtimeConfig?.axionpayBearer;
-const axionBaseUrl =
-  process.env.REACT_APP_AXIONPAY_BASE_URL ||
-  process.env.REACT_APP_AXIONPAY_API_URL ||
-  process.env.REACT_APP_AXION_PAY_BASE_URL ||
-  runtimeConfig?.axionPayBaseUrl ||
-  runtimeConfig?.axionpayBaseUrl ||
-  "http://localhost:3000";
+// Chave pública fixa para integração AxionPAY
+const axionApiKey = "change-me-public";
+// axionBearer removido (não utilizado)
+// Endpoints fixos para AxionPAY via API AnneTom
+const axionBaseUrl = "https://api.annetom.com/api/axionpay";
 
 const toResponse = (response) => ({
   ok: response.status >= 200 && response.status < 300,
@@ -86,8 +74,7 @@ export const serverInstance = {
       validateStatus: () => true,
       headers: {
         Accept: "application/json",
-        ...(axionApiKey ? { "x-api-key": axionApiKey } : {}),
-        ...(axionBearer ? { Authorization: `Bearer ${axionBearer}` } : {}),
+        "x-api-key": axionApiKey,
       },
     }),
   },
@@ -190,11 +177,12 @@ const confirmDelivery = async (orderId) => {
   }
 };
 
+
 const createPixPayment = async (params = {}, idempotencyKey) => {
   try {
     const payload = normalizePayload(params);
     const response = await serverInstance.paymentsDomain.instance.post(
-      `/payments/pix`,
+      `/pix`,
       payload,
       {
         headers: idempotencyKey
@@ -209,6 +197,27 @@ const createPixPayment = async (params = {}, idempotencyKey) => {
   }
 };
 
+// Novo método: pagamento via cartão (AXIONEPAY)
+const createCardPayment = async (params = {}, idempotencyKey) => {
+  try {
+    const payload = normalizePayload(params);
+    const response = await serverInstance.paymentsDomain.instance.post(
+      `/card`,
+      payload,
+      {
+        headers: idempotencyKey
+          ? { "Idempotency-Key": idempotencyKey }
+          : undefined,
+      }
+    );
+    return toResponse(response);
+  } catch (error) {
+    console.error(error);
+    return toErrorResponse(error);
+  }
+};
+
+
 const server = {
   fetchStatus,
   enviarParaDesktop,
@@ -219,6 +228,7 @@ const server = {
   fetchBusinessHours,
   confirmDelivery,
   createPixPayment,
+  createCardPayment,
 };
 
 export default server;

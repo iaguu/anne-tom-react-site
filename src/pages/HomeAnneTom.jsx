@@ -1583,31 +1583,6 @@ const styles = `
     transform: translateY(-3px);
   }
 
-  .home-cta {
-    position: relative;
-    overflow: hidden;
-    background: linear-gradient(135deg, #0f0f0f 0%, #26170f 55%, #0b0b0b 100%);
-  }
-
-  .home-cta::before {
-    content: "";
-    position: absolute;
-    inset: -40% 10% auto;
-    height: 180%;
-    background: radial-gradient(circle at 60% 40%, rgba(240, 122, 63, 0.22), transparent 70%);
-    pointer-events: none;
-  }
-
-  .home-cta-inner {
-    position: relative;
-    z-index: 1;
-  }
-
-  .home-cta-panel {
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
-    border-color: rgba(255, 255, 255, 0.18);
-  }
-
   .animate-page-in {
     animation: pageIn 0.35s ease-out;
   }
@@ -1915,4 +1890,3 @@ const styles = `
 
 
 export default HomeAnneTom;
-

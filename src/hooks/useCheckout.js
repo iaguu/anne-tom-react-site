@@ -1,16 +1,58 @@
-// src/hooks/useCheckout.js
+// src/hooks/useCheckout.jsx
 import { useCallback, useRef, useEffect, useMemo, useState } from "react";
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 import server from "../api/server";
 import { getFeeByDistance, parseDistanceKm } from "../utils/deliveryFees";
 import { getDistanceMatrix } from "../utils/googleMaps";
-
+ 
 const DISTANCE_MATRIX_API_KEY =
   process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "";
 const DELIVERY_ORIGIN =
   process.env.REACT_APP_DELIVERY_ORIGIN ||
   "Pizzaria Anne & Tom, Alto de Santana, Sao Paulo";
+
+const PAYMENT_SESSION_TTL_MS = 15 * 60 * 1000; // 15 minutos
+const PIX_SESSION_KEY = "axionpay_pix_session";
+const CARD_SESSION_KEY = "axionpay_card_session";
+
+const loadPaymentFromSession = (key, expectedTotal) => {
+  try {
+    if (typeof sessionStorage === "undefined") return null;
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return null;
+    const saved = JSON.parse(raw);
+    if (!saved || typeof saved !== "object") return null;
+    const createdAt = saved.createdAt || 0;
+    const total = saved.total;
+    if (!createdAt || typeof total !== "number") return null;
+
+    if (Date.now() - createdAt > PAYMENT_SESSION_TTL_MS) {
+      sessionStorage.removeItem(key);
+      return null;
+    }
+
+    if (Math.abs((expectedTotal || 0) - total) > 0.01) return null;
+
+    return saved.payment || null;
+  } catch {
+    return null;
+  }
+};
+
+const savePaymentToSession = (key, total, payment) => {
+  try {
+    if (typeof sessionStorage === "undefined") return;
+    const payload = {
+      createdAt: Date.now(),
+      total,
+      payment,
+    };
+    sessionStorage.setItem(key, JSON.stringify(payload));
+  } catch {
+    // ignore
+  }
+};
 
 /* ================= WHATSAPP BUILDER ================== */
 
@@ -30,13 +72,11 @@ const montarTextoWhatsApp = (itens, cliente, totalFinal, pagamento) => {
       const obsPizza = i.obsPizza ? `\n    Obs: ${i.obsPizza}` : "";
       const extrasTexto =
         Array.isArray(i.extras) && i.extras.length > 0
-          ? `
-    Adicionais: ${i.extras.join(", ")}`
+          ? `\n    Adicionais: ${i.extras.join(", ")}`
           : "";
-      const bordaTexto = i.borda ? `
-    Borda: ${i.borda}` : "";
+      const bordaTexto = i.borda ? `\n    Borda: ${i.borda}` : "";
 
-      return `? ${i.quantidade}x ${i.nome} (${i.tamanho}${saboresTexto}) ? R$ ${totalItem}${obsPizza}${extrasTexto}${bordaTexto}`;
+      return `• ${i.quantidade}x ${i.nome} (${i.tamanho}${saboresTexto}) — R$ ${totalItem}${obsPizza}${extrasTexto}${bordaTexto}`;
     })
     .join("\n");
 
@@ -118,7 +158,9 @@ async function enviarParaDesktop(items, dados, totalFinal, pagamento) {
           quantity: i.quantidade,
           unitPrice: i.precoUnitario,
           lineTotal: i.precoUnitario * i.quantidade,
-          isHalfHalf: Array.isArray(i.sabores) ? i.sabores.length > 1 : !!i.meio,
+          isHalfHalf: Array.isArray(i.sabores)
+            ? i.sabores.length > 1
+            : !!i.meio,
           halfDescription: Array.isArray(i.sabores)
             ? i.sabores.join(" / ")
             : i.meio || "",
@@ -135,9 +177,7 @@ async function enviarParaDesktop(items, dados, totalFinal, pagamento) {
       },
     };
 
-    console.log("📦 Enviando para desktop:", payload);
-
-    const res = await server.enviarParaDesktop(JSON.stringify(payload))
+    const res = await server.enviarParaDesktop(JSON.stringify(payload));
 
     if (!res.ok) {
       const txt = await res.text();
@@ -146,7 +186,6 @@ async function enviarParaDesktop(items, dados, totalFinal, pagamento) {
     }
 
     const data = await res.json();
-    console.log("✅ Pedido salvo no desktop:", data);
     return { ok: true, data };
   } catch (err) {
     console.error("⚠ Falha na conexão API → desktop:", err);
@@ -164,7 +203,9 @@ async function checkCustomerByPhone(phoneRaw) {
   }
 
   try {
-    const res = await server.checkCustomerByPhone(encodeURIComponent(phoneDigits))
+    const res = await server.checkCustomerByPhone(
+      encodeURIComponent(phoneDigits)
+    );
 
     if (res.status === 404) {
       return { found: false, customer: null };
@@ -203,7 +244,7 @@ async function salvarCliente(dadosCliente) {
   };
 
   try {
-    const res = await server.salvarCliente(JSON.stringify(payload))
+    const res = await server.salvarCliente(JSON.stringify(payload));
 
     if (!res.ok) {
       const txt = await res.text();
@@ -212,7 +253,6 @@ async function salvarCliente(dadosCliente) {
     }
 
     const customer = await res.json();
-    console.log("✅ Cliente salvo/atualizado:", customer);
     return customer;
   } catch (err) {
     console.error("⚠ Falha na conexão API → customers:", err);
@@ -223,14 +263,8 @@ async function salvarCliente(dadosCliente) {
 /* ================= HOOK PRINCIPAL ================== */
 
 export function useCheckout() {
-  const {
-    items,
-    total,
-    updateQuantity,
-    removeItem,
-    clearCart,
-    addItem,
-  } = useCart();
+  const { items, total, updateQuantity, removeItem, clearCart, addItem } =
+    useCart();
 
   // 0: Carrinho | 1: Dados | 2: Revisão | 3: Pagamento
   const [passo, setPasso] = useState(0);
@@ -241,6 +275,12 @@ export function useCheckout() {
   const [pixError, setPixError] = useState("");
   const pixIdempotencyRef = useRef(null);
   const pixTotalRef = useRef(null);
+
+  // CARTÃO (AXIONPAY)
+  const [cardPayment, setCardPayment] = useState(null);
+  const [cardLoading, setCardLoading] = useState(false);
+  const [cardError, setCardError] = useState("");
+  const cardIdempotencyRef = useRef(null);
 
   const { customer } = useAuth();
 
@@ -272,6 +312,7 @@ export function useCheckout() {
   const [deliveryEta, setDeliveryEta] = useState(null);
   const [deliveryEtaLoading, setDeliveryEtaLoading] = useState(false);
   const [deliveryEtaError, setDeliveryEtaError] = useState("");
+
   const distanceKm = useMemo(
     () => parseDistanceKm(deliveryEta?.distanceText),
     [deliveryEta]
@@ -345,7 +386,8 @@ export function useCheckout() {
         customer.firstName ||
         customer.lastName ||
         prev.nome,
-      telefone: prev.telefone || customer.telefone || customer.phone || prev.telefone,
+      telefone:
+        prev.telefone || customer.telefone || customer.phone || prev.telefone,
       cep: prev.cep || customer.address?.cep || prev.cep,
       endereco:
         prev.endereco ||
@@ -358,7 +400,11 @@ export function useCheckout() {
         customer.address?.bairro ||
         prev.bairro,
       customerId:
-        prev.customerId || customer.id || customer._id || customer.customerId || null,
+        prev.customerId ||
+        customer.id ||
+        customer._id ||
+        customer.customerId ||
+        null,
     }));
     setTipoCliente("existing");
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -377,10 +423,10 @@ export function useCheckout() {
 
   const deliveryFeeLabel =
     distanceFee != null
-      ? `Distancia (${distanceKm?.toFixed(1)} km)`
+      ? `Distância (${distanceKm?.toFixed(1)} km)`
       : dados.bairro
       ? `Bairro ${dados.bairro}`
-      : "Taxa padrao";
+      : "Taxa padrão";
 
   const totalItens = useMemo(
     () => items.reduce((acc, i) => acc + i.quantidade, 0),
@@ -401,23 +447,14 @@ export function useCheckout() {
   const dadosValidos = dadosBasicosValidos && enderecoValido;
   const distanciaOk = dados.retirada
     ? true
-    : distanceFee != null &&
-      !deliveryEtaLoading &&
-      !deliveryEtaError;
+    : distanceFee != null && !deliveryEtaLoading && !deliveryEtaError;
   const podeAvancarDados = dadosValidos && distanciaOk;
 
   const hasPixData =
     pagamento !== "pix" ||
-    Boolean(
-      pixPayment?.copiaColar ||
-        pixPayment?.qrcode
-    );
+    Boolean(pixPayment?.copiaColar || pixPayment?.qrcode);
 
-  const podeEnviar =
-    !semItens &&
-    podeAvancarDados &&
-    hasPixData &&
-    !enviando;
+  const podeEnviar = !semItens && podeAvancarDados && hasPixData && !enviando;
 
   /* =========== CUPOM =========== */
 
@@ -435,6 +472,14 @@ export function useCheckout() {
     setPixPayment(null);
     setPixError("");
     pixIdempotencyRef.current = null;
+    pixTotalRef.current = null;
+    try {
+      if (typeof sessionStorage !== "undefined") {
+        sessionStorage.removeItem(PIX_SESSION_KEY);
+      }
+    } catch {
+      // ignore
+    }
   }, []);
 
   useEffect(() => {
@@ -456,28 +501,38 @@ export function useCheckout() {
   }, [totalFinal, pagamento, pixPayment, resetPixPayment]);
 
   const buildPixPayload = (customerIdAtual) => {
-    const amountCents = Math.max(1, Math.round(totalFinal * 100));
+    const amount = Number(totalFinal.toFixed(2));
     const phoneDigits = (dados.telefone || "").replace(/\D/g, "");
 
     return {
-      amount_cents: amountCents,
-      currency: "BRL",
+      amount,
       customer: {
-        id: customerIdAtual || dados.customerId || null,
-        name: dados.nome || undefined,
-        phone: phoneDigits || undefined,
+        name: dados.nome || "Cliente",
+        email: dados.email || undefined,
       },
       metadata: {
+        orderId:
+          dados.orderId ||
+          customerIdAtual ||
+          dados.customerId ||
+          undefined,
         source: "anne-tom-site",
-        orderTotal: totalFinal,
-        itemsCount: totalItens,
-        customerId: customerIdAtual || dados.customerId || null,
+        customerPhone: phoneDigits || undefined,
       },
     };
   };
 
   const createPixPayment = async ({ force = false, customerId } = {}) => {
-    if (pixPayment && !force) return pixPayment;
+    if (!force && pixPayment) return pixPayment;
+
+    if (!force && !pixPayment) {
+      const cached = loadPaymentFromSession(PIX_SESSION_KEY, totalFinal);
+      if (cached) {
+        setPixPayment(cached);
+        pixTotalRef.current = totalFinal;
+        return cached;
+      }
+    }
 
     setPixError("");
     setPixLoading(true);
@@ -495,47 +550,73 @@ export function useCheckout() {
         requestPayload,
         pixIdempotencyRef.current
       );
-      const data = await res.json();
-      const responsePayload = data?.transaction || data?.data || null;
+      const data = await res.json().catch(() => null);
 
-      if (!res.ok || !responsePayload) {
+      if (!res.ok || !data) {
         setPixError(
           data?.message || "Nao foi possivel gerar o Pix agora."
         );
         return null;
       }
 
-      const pixRaw =
-        responsePayload?.metadata?.pix?.raw ||
-        responsePayload?.metadata?.pix ||
-        responsePayload?.pix ||
-        responsePayload ||
-        null;
+      let copiaColar = null;
+      let qrcode = null;
+      let transactionId = null;
+      let providerReference = null;
+      let status = null;
+      let amount = Number(totalFinal.toFixed(2));
+      let amountCents = Math.round(amount * 100);
+
+      if (typeof data.payload === "string") {
+        copiaColar = data.payload;
+      }
+
+      const tx = data.transaction || data.data || null;
+      if (tx) {
+        transactionId = tx.id || tx.transactionId || transactionId;
+        providerReference = tx.providerReference || providerReference;
+        status = tx.status || status;
+        amount = tx.amount != null ? tx.amount : amount;
+        amountCents =
+          tx.amountCents || tx.amount_cents || amountCents;
+
+        const metaPix = tx.metadata?.pix || tx.metadata || {};
+        if (!copiaColar) {
+          copiaColar =
+            metaPix.copia_colar ||
+            metaPix.copiaColar ||
+            metaPix.copyPaste ||
+            metaPix.pix_payload ||
+            null;
+        }
+        qrcode =
+          metaPix.qrcode ||
+          metaPix.qrCode ||
+          metaPix.qr_code ||
+          metaPix.pix_qr_code ||
+          null;
+      }
+
+      if (!copiaColar) {
+        setPixError("Nao foi possivel gerar o Pix agora.");
+        return null;
+      }
 
       const nextPixPayment = {
-        transactionId:
-          responsePayload?.id || responsePayload?.transactionId || null,
-        providerReference: responsePayload?.providerReference || null,
-        status: responsePayload?.status || null,
-        amount: responsePayload?.amount || null,
-        amountCents: responsePayload?.amount_cents || null,
-        qrcode:
-          pixRaw?.qrcode ||
-          pixRaw?.qrCode ||
-          pixRaw?.qr_code ||
-          pixRaw?.pix_qr_code ||
-          null,
-        copiaColar:
-          pixRaw?.copia_colar ||
-          pixRaw?.copiaColar ||
-          pixRaw?.copyPaste ||
-          pixRaw?.pix_payload ||
-          null,
-        expiresAt: pixRaw?.expiresAt || pixRaw?.expires_at || null,
-        raw: pixRaw,
+        transactionId,
+        providerReference,
+        status,
+        amount,
+        amountCents,
+        qrcode,
+        copiaColar,
+        expiresAt: null,
+        raw: data,
       };
 
       setPixPayment(nextPixPayment);
+      savePaymentToSession(PIX_SESSION_KEY, totalFinal, nextPixPayment);
+      pixTotalRef.current = totalFinal;
       return nextPixPayment;
     } catch (err) {
       console.error("[useCheckout] pix error:", err);
@@ -545,6 +626,119 @@ export function useCheckout() {
       setPixLoading(false);
     }
   };
+
+  /* =========== CARTÃO (AXIONPAY) =========== */
+
+  const resetCardPayment = useCallback(() => {
+    setCardPayment(null);
+    setCardError("");
+    cardIdempotencyRef.current = null;
+    try {
+      if (typeof sessionStorage !== "undefined") {
+        sessionStorage.removeItem(CARD_SESSION_KEY);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    if (pagamento !== "cartao") {
+      resetCardPayment();
+    }
+  }, [pagamento, resetCardPayment]);
+
+  const buildCardPayload = () => {
+    const amount = Number(totalFinal.toFixed(2));
+    return {
+      amount,
+      customer: {
+        name: dados.nome,
+        email: dados.email,
+        phone_number: dados.telefone,
+      },
+      card: dados.card || undefined,
+      metadata: {
+        address: {
+          cep: dados.cep,
+          street: dados.endereco,
+          neighborhood: dados.bairro,
+          number: dados.numero,
+          complement: dados.complemento,
+        },
+        orderId: dados.orderId || undefined,
+      },
+    };
+  };
+
+  const createCardPayment = async ({ force = false } = {}) => {
+    if (!force && cardPayment) return cardPayment;
+
+    if (!force && !cardPayment) {
+      const cached = loadPaymentFromSession(CARD_SESSION_KEY, totalFinal);
+      if (cached) {
+        setCardPayment(cached);
+        return cached;
+      }
+    }
+
+    setCardError("");
+    setCardLoading(true);
+
+    if (!cardIdempotencyRef.current || force) {
+      cardIdempotencyRef.current =
+        typeof crypto !== "undefined" && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `card-${Date.now()}-${Math.round(Math.random() * 1e6)}`;
+    }
+
+    try {
+      const requestPayload = buildCardPayload();
+      const res = await server.createCardPayment(
+        requestPayload,
+        cardIdempotencyRef.current
+      );
+      const data = await res.json().catch(() => null);
+      const responsePayload = data?.transaction || data?.data || null;
+
+      if (!res.ok || !responsePayload) {
+        setCardError(
+          data?.message || "Não foi possível processar o cartão agora."
+        );
+        return null;
+      }
+
+      setCardPayment(responsePayload);
+      savePaymentToSession(CARD_SESSION_KEY, totalFinal, responsePayload);
+
+      const url = responsePayload?.metadata?.providerRaw?.url;
+      if (url) {
+        window.location.href = url;
+      }
+
+      return responsePayload;
+    } catch (err) {
+      console.error("[useCheckout] card error:", err);
+      setCardError("Não foi possível processar o cartão agora.");
+      return null;
+    } finally {
+      setCardLoading(false);
+    }
+  };
+
+  // Geração automática das transações de pagamento (PIX/cartão) ao entrar no passo "Pagamento"
+  useEffect(() => {
+    if (passo !== 3) return;
+
+    if (pagamento === "pix" && !pixPayment && !pixLoading) {
+      createPixPayment().catch(() => {});
+    }
+
+    if (pagamento === "cartao" && !cardPayment && !cardLoading) {
+      createCardPayment().catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [passo, pagamento, pixPayment, pixLoading, cardPayment, cardLoading]);
 
   /* =========== ETA ENTREGA (DISTANCE MATRIX) =========== */
 
@@ -644,7 +838,6 @@ export function useCheckout() {
   const onBuscarClientePorTelefone = async (telefoneAtual) => {
     const phoneDigits = (telefoneAtual || "").replace(/\D/g, "");
 
-    // se apagou o telefone
     if (!phoneDigits) {
       setErroClienteApi("");
       setClienteExistente(null);
@@ -652,10 +845,7 @@ export function useCheckout() {
       return;
     }
 
-    // se ainda não tem dígitos suficientes
     if (phoneDigits.length < 10) return;
-
-    // impede busca repetida
     if (checandoCliente) return;
 
     if (lastPhoneCheckedRef.current === phoneDigits) return;
@@ -677,15 +867,13 @@ export function useCheckout() {
         "Cliente não encontrado. Complete seus dados para finalizar o cadastro."
       );
       setClienteExistente(null);
-
       setDados((d) => ({ ...d, customerId: null }));
       return;
     }
 
     const c = resultado.customer;
     setClienteExistente(c);
-
-    setErroClienteApi(""); // só some quando realmente encontrou
+    setErroClienteApi("");
 
     setDados((d) => ({
       ...d,
@@ -705,7 +893,9 @@ export function useCheckout() {
       if (p === 1 && !podeAvancarDados) return p;
       return Math.min(p + 1, 3);
     });
+
   const voltar = () => setPasso((p) => Math.max(p - 1, 0));
+
   const irParaStep = (idx) =>
     setPasso((p) => {
       if (idx < 0 || idx > 3) return p;
@@ -726,7 +916,6 @@ export function useCheckout() {
     setEnviando(true);
 
     try {
-      // 1) garante cliente salvo
       let customerIdAtual = dados.customerId || null;
       if (!customerIdAtual) {
         const clienteSalvo = await salvarCliente(dados);
@@ -747,7 +936,6 @@ export function useCheckout() {
         }
       }
 
-      // 2) monta dados completos pro resumo / API
       const payloadCliente = {
         ...dados,
         customerId: customerIdAtual,
@@ -756,7 +944,6 @@ export function useCheckout() {
         desconto,
       };
 
-      // 3) envia para desktop
       const desktopResult = await enviarParaDesktop(
         items,
         {
@@ -767,7 +954,6 @@ export function useCheckout() {
         pagamento
       );
 
-      // tenta extrair o pedido criado e o ID do backend
       let order = null;
       let backendOrderId = null;
 
@@ -789,7 +975,6 @@ export function useCheckout() {
           null;
       }
 
-      // número "humano" pra exibir (#12345)
       const numeroPedidoHuman =
         order?.numeroPedido ||
         order?.codigoPedido ||
@@ -797,7 +982,6 @@ export function useCheckout() {
           ? String(backendOrderId).split("-").slice(-1)[0]
           : null);
 
-      // 4) monta resumo pro front
       const orderSummary = {
         items,
         subtotal,
@@ -823,20 +1007,17 @@ export function useCheckout() {
         trackingId: backendOrderId,
       };
 
-      // 5) salva resumo local
       try {
         localStorage.setItem("lastOrderSummary", JSON.stringify(orderSummary));
       } catch {
-        // ignora
+        // ignore
       }
 
-      // 6) limpa carrinho apenas se o envio deu certo
       const wasSuccess = !!desktopResult?.ok;
       if (wasSuccess) {
         clearCart();
       }
 
-      // 7) devolve tudo pro CheckoutPage
       return {
         success: wasSuccess,
         order,
@@ -866,7 +1047,7 @@ export function useCheckout() {
     avancar,
     voltar,
     irParaStep,
-
+ 
     // dados cliente
     dados,
     setDados,
@@ -892,11 +1073,19 @@ export function useCheckout() {
     // pagamento
     pagamento,
     setPagamento,
+
+    // PIX
     pixPayment,
     pixLoading,
     pixError,
     createPixPayment,
     resetPixPayment,
+
+    // CARTÃO
+    cardPayment,
+    cardLoading,
+    cardError,
+    createCardPayment,
 
     // totais
     subtotal,
