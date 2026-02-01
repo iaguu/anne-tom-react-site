@@ -179,6 +179,19 @@ body {
   box-shadow: 0 16px 28px -22px rgba(245, 158, 11, 0.6), 0 6px 16px -14px rgba(15, 23, 42, 0.45);
 }
 
+.premium-info-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid rgba(14, 116, 144, 0.2);
+  background: rgba(224, 242, 254, 0.8);
+  color: #0f172a;
+  font-weight: 600;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
 .pix-box {
   background: linear-gradient(135deg, rgba(255, 247, 237, 0.95) 0%, #fff 55%, rgba(255, 236, 210, 0.65) 100%);
   border-color: rgba(245, 158, 11, 0.25);

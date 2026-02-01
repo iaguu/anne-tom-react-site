@@ -6,11 +6,27 @@ const runtimeConfig =
     : undefined;
 const apiKey = process.env.REACT_APP_AT_API_KEY;
 const publicToken = process.env.REACT_APP_PUBLIC_API_TOKEN;
+const authToken = apiKey || publicToken;
 // Chave pública fixa para integração AxionPAY
 const axionApiKey = "change-me-public";
+const axionPayTag = process.env.REACT_APP_AXIONPAY_PAY_TAG || "user-test";
 // axionBearer removido (não utilizado)
-// Endpoints fixos para AxionPAY via API AnneTom
-const axionBaseUrl = "https://api.annetom.com/api/axionpay";
+// Endpoints AxionPAY configuraveis via env
+const atBaseUrl =
+  process.env.REACT_APP_AT_API_BASE_URL || "https://api.annetom.com";
+const normalizeBaseUrl = (base) => String(base || "").replace(/\/+$/, "");
+const baseDomainUrl = normalizeBaseUrl(atBaseUrl).replace(/\/api$/, "");
+const buildAxionProxyUrl = (base) => {
+  const normalized = normalizeBaseUrl(base);
+  if (!normalized) return "";
+  return normalized.endsWith("/api")
+    ? `${normalized}/axionpay`
+    : `${normalized}/api/axionpay`;
+};
+const axionBaseUrl =
+  process.env.REACT_APP_AXIONPAY_BASE_URL ||
+  buildAxionProxyUrl(atBaseUrl) ||
+  "https://pay.axionenterprise.cloud";
 
 const toResponse = (response) => ({
   ok: response.status >= 200 && response.status < 300,
@@ -53,14 +69,12 @@ export const serverInstance = {
   baseDomain: {
     instance: axios.create({
       timeout: 15000,
-      baseURL:
-        process.env.REACT_APP_AT_API_BASE_URL || "https://api.annetom.com",
+      baseURL: baseDomainUrl,
       validateStatus: () => true,
       headers: {
         Accept: "application/json",
         "ngrok-skip-browser-warning": "true",
-        ...(apiKey ? { "x-api-key": apiKey } : {}),
-        ...(publicToken ? { "x-api-key": publicToken } : {}),
+        ...(authToken ? { "x-api-key": authToken } : {}),
         ...(!apiKey && !publicToken && runtimeConfig?.apiKey
           ? { Authorization: `Bearer ${runtimeConfig.apiKey}` }
           : {}),
@@ -75,6 +89,7 @@ export const serverInstance = {
       headers: {
         Accept: "application/json",
         "x-api-key": axionApiKey,
+        "pay-tag": axionPayTag,
       },
     }),
   },
@@ -182,7 +197,7 @@ const createPixPayment = async (params = {}, idempotencyKey) => {
   try {
     const payload = normalizePayload(params);
     const response = await serverInstance.paymentsDomain.instance.post(
-      `/pix`,
+      `/payments/pix`,
       payload,
       {
         headers: idempotencyKey
@@ -202,7 +217,7 @@ const createCardPayment = async (params = {}, idempotencyKey) => {
   try {
     const payload = normalizePayload(params);
     const response = await serverInstance.paymentsDomain.instance.post(
-      `/card`,
+      `/payments/card`,
       payload,
       {
         headers: idempotencyKey

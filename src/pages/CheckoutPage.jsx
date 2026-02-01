@@ -12,6 +12,7 @@ import ResumoMobile from "../components/checkout/ResumoMobile";
 
 const CheckoutPage = () => {
   const navigate = useNavigate();
+  const PENDING_CARD_ORDER_KEY = "pending_card_order";
 
   const {
     // cart
@@ -52,7 +53,11 @@ const CheckoutPage = () => {
     pixPayment,
     pixLoading,
     pixError,
-    createPixPayment,
+    cardPayment,
+    cardLoading,
+    cardError,
+    createCardPayment,
+    cardCheckoutUrl,
 
     // totais
     subtotal,
@@ -90,6 +95,55 @@ const CheckoutPage = () => {
     if (!podeEnviar || enviando) return;
 
     try {
+      if (pagamento === "cartao") {
+        const resolveCardUrl = (payment) =>
+          payment?.checkoutUrl ||
+          payment?.metadata?.providerRaw?.url ||
+          payment?.metadata?.url ||
+          payment?.url ||
+          "";
+
+        let checkoutUrl = cardCheckoutUrl || resolveCardUrl(cardPayment);
+        let cardSnapshot = cardPayment;
+
+        if (!checkoutUrl) {
+          const createdPayment = await createCardPayment();
+          cardSnapshot = createdPayment || cardSnapshot;
+          checkoutUrl = resolveCardUrl(createdPayment);
+        }
+
+        if (!checkoutUrl) {
+          console.warn(
+            "[CheckoutPage] Link de pagamento do cartão indisponível."
+          );
+          return;
+        }
+
+        const pendingPayload = {
+          createdAt: Date.now(),
+          items,
+          dados,
+          subtotal,
+          taxaEntrega,
+          desconto,
+          totalFinal,
+          pagamento,
+          cardPayment: cardSnapshot,
+        };
+
+        try {
+          localStorage.setItem(
+            PENDING_CARD_ORDER_KEY,
+            JSON.stringify(pendingPayload)
+          );
+        } catch (e) {
+          console.warn("[CheckoutPage] Falha ao salvar pendingCardOrder:", e);
+        }
+
+        window.open(checkoutUrl, "_blank", "noopener,noreferrer");
+        return;
+      }
+
       const result = await enviarPedido();
 
       console.log("[CheckoutPage] resultado enviarPedido:", result);
@@ -112,14 +166,14 @@ const CheckoutPage = () => {
         numeroPedido,
         backendOrderId: backendOrderIdFromResult,
         trackingId: trackingIdFromResult,
-        items,
-        orders,
+        items: resultItems,
+        orders: resultOrders,
       } = result;
 
       const firstOrderFromArray =
-        Array.isArray(orders) && orders.length > 0 ? orders[0] : null;
+        Array.isArray(resultOrders) && resultOrders.length > 0 ? resultOrders[0] : null;
       const firstItemFromArray =
-        Array.isArray(items) && items.length > 0 ? items[0] : null;
+        Array.isArray(resultItems) && resultItems.length > 0 ? resultItems[0] : null;
 
       // tenta descobrir o id real do pedido criado no backend (o mesmo do PDV / motoboy)
       const backendOrderId =
@@ -256,6 +310,7 @@ const CheckoutPage = () => {
                 deliveryEtaError={deliveryEtaError}
                 distanceFee={distanceFee}
                 deliveryFeeLabel={deliveryFeeLabel}
+                desconto={desconto}
               />
             )}
 
@@ -280,7 +335,9 @@ const CheckoutPage = () => {
                 pixPayment={pixPayment}
                 pixLoading={pixLoading}
                 pixError={pixError}
-                onCreatePix={createPixPayment}
+                cardPayment={cardPayment}
+                cardLoading={cardLoading}
+                cardError={cardError}
               />
             )}
 
@@ -329,15 +386,23 @@ const CheckoutPage = () => {
               )}
 
               {passo === 3 && (
-                <button
-                  onClick={handleEnviarPedido}
-                  disabled={!podeEnviar}
-                  className={`premium-button premium-button--success px-7 py-3 text-xs font-semibold ${
-                    podeEnviar ? "" : "opacity-60 cursor-not-allowed"
-                  }`}
-                >
-                  {enviando ? "Enviando..." : "Enviar Pedido"}
-                </button>
+                <div className="flex flex-col items-end gap-2">
+                  {pagamento === "cartao" && (
+                    <p className="text-[11px] text-slate-500 text-right">
+                      Ao clicar em Enviar Pedido, abriremos o link de pagamento
+                      em uma nova aba.
+                    </p>
+                  )}
+                  <button
+                    onClick={handleEnviarPedido}
+                    disabled={!podeEnviar}
+                    className={`premium-button premium-button--success px-7 py-3 text-xs font-semibold ${
+                      podeEnviar ? "" : "opacity-60 cursor-not-allowed"
+                    }`}
+                  >
+                    {enviando ? "Enviando..." : "Enviar Pedido"}
+                  </button>
+                </div>
               )}
             </div>
           </div>

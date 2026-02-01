@@ -1,7 +1,8 @@
 // src/pages/OrderConfirmationPage.jsx
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import server from "../api/server";
+import { enviarParaDesktop } from "../hooks/useCheckout";
 import { formatCurrencyBRL } from "../utils/menu";
 
 // -----------------------------
@@ -70,6 +71,26 @@ const etaTextForStatus = (statusKey, bairro) => {
   return null;
 };
 
+const PENDING_CARD_ORDER_KEY = "pending_card_order";
+
+const normalizePaymentStatus = (value) => {
+  if (!value) return "";
+  return String(value).toLowerCase().trim();
+};
+
+const isPaymentApproved = (value) => {
+  const status = normalizePaymentStatus(value);
+  return [
+    "paid",
+    "approved",
+    "success",
+    "succeeded",
+    "captured",
+    "true",
+    "1",
+  ].includes(status);
+};
+
 const OrderConfirmationPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -88,6 +109,14 @@ const OrderConfirmationPage = () => {
   const [confirmError, setConfirmError] = useState("");
   const [deliveryConfirmed, setDeliveryConfirmed] = useState(false);
   const [pixCopied, setPixCopied] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState("");
+  const [confirmingPayment, setConfirmingPayment] = useState(false);
+  const [paymentConfirmError, setPaymentConfirmError] = useState("");
+  const [paymentInfo, setPaymentInfo] = useState({
+    status: "",
+    transactionId: "",
+    raw: {},
+  });
 
   // -------------------------------------------------------------------
   // 1) Resolver resumo + trackingId (URL + state + localStorage)
@@ -160,6 +189,43 @@ const OrderConfirmationPage = () => {
       resolved,
     });
   }, [location.state]);
+
+  // -------------------------------------------------------------------
+  // 1.5) Status de pagamento vindo do retorno do gateway
+  // -------------------------------------------------------------------
+  useEffect(() => {
+    let statusFromUrl = "";
+    let transactionIdFromUrl = "";
+    let rawParams = {};
+    try {
+      const searchParams = new URLSearchParams(window.location.search || "");
+      rawParams = Object.fromEntries(searchParams.entries());
+      statusFromUrl =
+        searchParams.get("paymentStatus") ||
+        searchParams.get("payment_status") ||
+        searchParams.get("status") ||
+        searchParams.get("transaction_status") ||
+        searchParams.get("result") ||
+        searchParams.get("success") ||
+        "";
+      transactionIdFromUrl =
+        searchParams.get("transaction_id") ||
+        searchParams.get("payment_id") ||
+        searchParams.get("id") ||
+        searchParams.get("reference") ||
+        "";
+    } catch {
+      statusFromUrl = "";
+      transactionIdFromUrl = "";
+      rawParams = {};
+    }
+    setPaymentStatus(statusFromUrl || "");
+    setPaymentInfo({
+      status: statusFromUrl || "",
+      transactionId: transactionIdFromUrl || "",
+      raw: rawParams,
+    });
+  }, [location.search]);
 
   // -------------------------------------------------------------------
   // Derivados para mostrar na tela
@@ -242,6 +308,174 @@ const OrderConfirmationPage = () => {
       setPixCopied(false);
     }
   };
+
+  const saveCustomerIfNeeded = useCallback(async (dadosCliente) => {
+    if (!dadosCliente?.telefone || !dadosCliente?.nome) return null;
+    const phoneDigits = (dadosCliente.telefone || "").replace(/\D/g, "");
+    if (!phoneDigits || phoneDigits.length < 10) return null;
+
+    const payload = {
+      source: "website",
+      name: dadosCliente.nome,
+      phone: phoneDigits,
+      address: {
+        cep: dadosCliente.cep || "",
+        street: dadosCliente.endereco || "",
+        neighborhood: dadosCliente.bairro || "",
+      },
+    };
+
+    try {
+      const res = await server.salvarCliente(JSON.stringify(payload));
+      if (!res.ok) return null;
+      const customer = await res.json();
+      return customer || null;
+    } catch (err) {
+      console.error("[OrderConfirmation] erro ao salvar cliente:", err);
+      return null;
+    }
+  }, []);
+
+  const resolveOrderFromResponse = useCallback((data) => {
+    if (!data) return null;
+    if (Array.isArray(data.items) && data.items.length > 0) {
+      return data.items[0];
+    }
+    if (data.order) return data.order;
+    return data;
+  }, []);
+
+  // -------------------------------------------------------------------
+  // 1.6) Confirmar pedido após retorno do pagamento (cartão)
+  // -------------------------------------------------------------------
+  useEffect(() => {
+    if (!isPaymentApproved(paymentStatus)) return;
+    if (confirmingPayment) return;
+
+    let pending = null;
+    try {
+      const raw = localStorage.getItem(PENDING_CARD_ORDER_KEY);
+      pending = raw ? JSON.parse(raw) : null;
+    } catch {
+      pending = null;
+    }
+
+    if (!pending || pending.sentAt) return;
+
+    let cancelled = false;
+
+    const confirmPendingOrder = async () => {
+      setConfirmingPayment(true);
+      setPaymentConfirmError("");
+
+      try {
+        let customerIdAtual = pending.dados?.customerId || null;
+        if (!customerIdAtual) {
+          const savedCustomer = await saveCustomerIfNeeded(pending.dados);
+          customerIdAtual = savedCustomer?.id || null;
+        }
+
+        const payloadCliente = {
+          ...pending.dados,
+          customerId: customerIdAtual,
+          subtotal: pending.subtotal,
+          taxaEntrega: pending.taxaEntrega,
+          desconto: pending.desconto,
+        };
+
+        const desktopResult = await enviarParaDesktop(
+          pending.items,
+          payloadCliente,
+          pending.totalFinal,
+          pending.pagamento
+        );
+
+        if (!desktopResult?.ok || !desktopResult.data) {
+          throw new Error("Falha ao confirmar o pedido no backend.");
+        }
+
+        const data = desktopResult.data;
+        const order = resolveOrderFromResponse(data);
+        const backendOrderId =
+          order?.id ||
+          data.orderId ||
+          data.id ||
+          (Array.isArray(data.items) ? data.items[0]?.id : null) ||
+          null;
+
+        const numeroPedidoHuman =
+          order?.numeroPedido ||
+          order?.codigoPedido ||
+          (backendOrderId
+            ? String(backendOrderId).split("-").slice(-1)[0]
+            : null);
+
+        const orderSummary = {
+          items: pending.items,
+          subtotal: pending.subtotal,
+          taxaEntrega: pending.taxaEntrega,
+          desconto: pending.desconto,
+          totalFinal: pending.totalFinal,
+          pixPayment: pending.pixPayment || null,
+          paymentStatus: normalizePaymentStatus(paymentStatus || ""),
+          paymentTransactionId: paymentInfo?.transactionId || "",
+          paymentRaw: paymentInfo?.raw || {},
+          dados: payloadCliente,
+          numeroPedido: numeroPedidoHuman,
+          codigoPedido: numeroPedidoHuman,
+          backendOrderId,
+          trackingId: backendOrderId,
+        };
+
+        try {
+          localStorage.setItem(
+            "lastOrderSummary",
+            JSON.stringify(orderSummary)
+          );
+        } catch {
+          // ignore
+        }
+
+        if (!cancelled) {
+          setResumo(orderSummary);
+          setTrackingId(backendOrderId);
+        }
+
+        try {
+          localStorage.setItem(
+            PENDING_CARD_ORDER_KEY,
+            JSON.stringify({
+              ...pending,
+              sentAt: Date.now(),
+              backendOrderId,
+            })
+          );
+        } catch {
+          // ignore
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error("[OrderConfirmation] erro ao confirmar pagamento:", err);
+          setPaymentConfirmError(
+            "Nao foi possivel confirmar o pedido apos o pagamento."
+          );
+        }
+      } finally {
+        if (!cancelled) setConfirmingPayment(false);
+      }
+    };
+
+    confirmPendingOrder();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    paymentStatus,
+    paymentInfo,
+    confirmingPayment,
+    saveCustomerIfNeeded,
+    resolveOrderFromResponse,
+  ]);
 
   // -------------------------------------------------------------------
   // 2) Polling em tempo real – agora lendo data.items[0] ou data.order
@@ -389,6 +623,26 @@ const OrderConfirmationPage = () => {
                       Número do pedido:&nbsp;
                     </span>
                     #{codigoPedido}
+                  </p>
+                )}
+                {paymentStatus && (
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Status do pagamento: {normalizePaymentStatus(paymentStatus)}
+                  </p>
+                )}
+                {paymentInfo?.transactionId && (
+                  <p className="text-[10px] text-slate-500 mt-0.5">
+                    Transacao: {paymentInfo.transactionId}
+                  </p>
+                )}
+                {confirmingPayment && (
+                  <p className="text-[10px] text-slate-500 mt-0.5">
+                    Confirmando pagamento e finalizando o pedido...
+                  </p>
+                )}
+                {paymentConfirmError && (
+                  <p className="text-[10px] text-amber-700 mt-0.5">
+                    {paymentConfirmError}
                   </p>
                 )}
                 {trackingId ? (
@@ -655,6 +909,25 @@ const OrderConfirmationPage = () => {
                         </span>
                       )}
                     </div>
+                    <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                      <p className="text-[11px] font-semibold text-amber-800 mb-1">
+                        ⚠️ IMPORTANTE: Liberação do Pedido
+                      </p>
+                      <p className="text-[11px] text-amber-700">
+                        Após pagar o Pix, envie o <strong>comprovante de pagamento</strong> para nosso WhatsApp:
+                      </p>
+                      <a
+                        href="https://api.whatsapp.com/send?phone=5511932507007"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-block mt-2 px-3 py-1.5 bg-emerald-600 text-white text-[11px] rounded-lg font-medium hover:bg-emerald-700 transition"
+                      >
+                        Enviar Comprovante via WhatsApp
+                      </a>
+                      <p className="text-[10px] text-amber-600 mt-2">
+                        Seu pedido só será liberado após o envio do comprovante.
+                      </p>
+                    </div>
                   </div>
                 )}
               </div>
@@ -695,11 +968,23 @@ const OrderConfirmationPage = () => {
                     </span>
                   </p>
                 )}
-                {resumo.dados.endereco && (
+                {(resumo.dados.endereco ||
+                  resumo.dados.numero ||
+                  resumo.dados.complemento) && (
                   <p>
-                    <span className="text-slate-500">Endereço: </span>
+                    <span className="text-slate-500">Endereco: </span>
                     <span className="font-medium">
-                      {resumo.dados.endereco}
+                      {[
+                        resumo.dados.endereco,
+                        resumo.dados.numero
+                          ? `, ${resumo.dados.numero}`
+                          : "",
+                        resumo.dados.complemento
+                          ? ` - ${resumo.dados.complemento}`
+                          : "",
+                      ]
+                        .join("")
+                        .trim()}
                     </span>
                   </p>
                 )}

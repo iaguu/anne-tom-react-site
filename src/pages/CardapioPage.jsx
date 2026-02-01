@@ -25,6 +25,8 @@ import { formatCurrencyBRL, normalizeExtrasFromJson } from "../utils/menu";
 import { useMenuData } from "../hooks/useMenuData";
 import RetryBanner from "../components/ui/RetryBanner";
 import { useAppAccessInfo } from "../hooks/useAppAccess";
+import SEOHead from "../components/seo/SEOHead";
+import PizzaImage from "../components/seo/PizzaImage";
 
 // Horários oficiais (Tripadvisor):
 // Domingo: 19:00–23:00
@@ -766,6 +768,12 @@ const CardapioPage = () => {
 
   return (
     <div className="premium-page min-h-screen">
+      <SEOHead 
+        title="Cardápio Completo - Pizzas Artesanais"
+        description="🍕 Veja nosso cardápio completo com pizzas artesanais, massas especiais, bordas recheadas e muito mais. Peça agora e receba em casa!"
+        keywords={['cardápio pizza', 'pizzas artesanais', 'delivery pizza', 'pizza zona norte', 'sabores pizza']}
+      />
+      
       {/* HEADER */}
       <header className="premium-panel border-b bg-white/90 backdrop-blur">
         <div className="max-w-6xl mx-auto h-16 px-4 flex items-center justify-between">

@@ -1,4 +1,4 @@
-﻿// src/utils/menu.js
+// src/utils/menu.js
 export const MENU_CACHE_KEY = "anne_tom_menu_cache_v1";
 
 export const formatCurrencyBRL = (value) =>

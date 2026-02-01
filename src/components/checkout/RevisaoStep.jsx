@@ -8,6 +8,16 @@ const RevisaoStep = ({
   desconto,
   totalFinal,
 }) => {
+  const enderecoResumo = [
+    dados.endereco,
+    dados.numero ? `, ${dados.numero}` : "",
+    dados.complemento ? ` - ${dados.complemento}` : "",
+  ]
+    .join("")
+    .trim();
+
+  const cidadeUf = [dados.cidade, dados.uf].filter(Boolean).join(" / ");
+
   return (
     <div className="space-y-6">
       <h2 className="font-semibold text-lg">Revise seus dados</h2>
@@ -17,10 +27,11 @@ const RevisaoStep = ({
           <h3 className="text-xs font-semibold text-slate-500 mb-1">
             Cliente
           </h3>
-          <p className="font-medium text-slate-900">{dados.nome || "—"}</p>
-          <p className="text-xs text-slate-600">
-            {dados.telefone || "—"}
-          </p>
+          <p className="font-medium text-slate-900">{dados.nome || "-"}</p>
+          <p className="text-xs text-slate-600">{dados.telefone || "-"}</p>
+          {dados.email && (
+            <p className="text-[11px] text-slate-500">{dados.email}</p>
+          )}
         </div>
 
         <hr className="border-slate-200" />
@@ -30,21 +41,31 @@ const RevisaoStep = ({
             Entrega
           </h3>
           <p className="text-xs text-slate-700">
-            {dados.retirada ? "Retirada na loja" : "Entrega em domicílio"}
+            {dados.retirada ? "Retirada na loja" : "Entrega em domicilio"}
           </p>
           {!dados.retirada && (
             <>
               <p className="text-xs text-slate-700 mt-1">
-                {dados.endereco || "Endereço não informado"}
+                {enderecoResumo || "Endereco nao informado"}
               </p>
               <p className="text-[11px] text-slate-500">
-                Bairro: {dados.bairro || "—"} · CEP: {dados.cep || "—"}
+                Bairro: {dados.bairro || "-"} · CEP: {dados.cep || "-"}
               </p>
+              {cidadeUf && (
+                <p className="text-[11px] text-slate-500">
+                  Cidade/UF: {cidadeUf}
+                </p>
+              )}
+              {dados.referencia && (
+                <p className="text-[11px] text-slate-500">
+                  Referencia: {dados.referencia}
+                </p>
+              )}
             </>
           )}
           {dados.obsGerais && (
             <p className="mt-2 text-[11px] text-slate-600">
-              <span className="font-semibold">Observações: </span>
+              <span className="font-semibold">Observacoes: </span>
               {dados.obsGerais}
             </p>
           )}

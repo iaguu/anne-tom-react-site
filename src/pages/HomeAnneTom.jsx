@@ -6,6 +6,8 @@ import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useMenuData } from "../hooks/useMenuData";
 import { formatCurrencyBRL } from "../utils/menu";
 import { HOME_MENU_OVERRIDES, matchOverrides } from "../data/menuOverrides";
+import SEOHead from "../components/seo/SEOHead";
+import PizzaImage from "../components/seo/PizzaImage";
 
 import { useAppAccessInfo } from "../hooks/useAppAccess";
 import RetryBanner from "../components/ui/RetryBanner";
@@ -89,6 +91,12 @@ const HomeAnneTom = () => {
   return (
 
     <div className="home-anne-tom min-h-screen text-slate-900 antialiased">
+
+      <SEOHead 
+        title="Pizzaria Anne & Tom - Pizzas Artesanais na Zona Norte"
+        description="🍕 Pizzaria Anne & Tom: As melhores pizzas artesanais da Zona Norte de São Paulo. Massa fermentada por 48h, ingredientes frescos e delivery rápido. Peça agora!"
+        keywords={['pizzaria zona norte', 'pizza artesanal', 'delivery pizza', 'pizza Santana', 'massa fina pizza']}
+      />
 
       <div className="animate-page-in">
 
@@ -718,24 +726,12 @@ const Hero = ({ imageLoaded, setImageLoaded }) => (
 
 
 
-          <img
-
-            src={PIZZA_IMAGE_SRC}
-
-            alt="Pizza artesanal Anne & Tom"
-
-            className={`w-full h-full object-cover transition-opacity duration-700 ${
-
-              imageLoaded ? "opacity-100" : "opacity-0"
-
-            }`}
-
+          <PizzaImage
+            pizza={{ nome: 'Pizza Artesanal Anne & Tom', categoria: 'default' }}
+            size="hero"
+            className="w-full h-full object-cover"
+            priority={true}
             onLoad={() => setImageLoaded(true)}
-
-            loading="lazy"
-
-            decoding="async"
-
           />
 
         </div>
@@ -896,7 +892,7 @@ const BestSellerCard = ({ item, onSelect }) => (
       {item.priceLabel}
     </p>
     <span className="mt-2 text-[11px] text-amber-600 font-medium">
-      Ver detalhes no cardapio ->
+      Ver detalhes no cardápio &rarr;
     </span>
   </button>
 );
@@ -1340,7 +1336,7 @@ const FinalCTA = () => (
 
   <section className="home-cta">
 
-    <div className="home-cta-inner max-w-6xl mx-auto px-4 lg:px-6 py-12 lg:py-16 text-center space-y-4 text-white">
+    <div className="home-cta-inner max-w-6xl mx-auto px-4 lg:px-6 py-12 lg:py-16 text-center space-y-4 text-slate-900">
 
       <h2 className="text-2xl lg:text-3xl font-black tracking-tight">
 
@@ -1350,7 +1346,7 @@ const FinalCTA = () => (
 
 
 
-      <p className="text-sm md:text-base text-slate-200 max-w-2xl mx-auto">
+      <p className="text-sm md:text-base text-slate-600 max-w-2xl mx-auto">
 
         Monte seu pedido pelo cardápio interno, revise tudo no checkout e envie
 

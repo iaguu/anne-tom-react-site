@@ -1,7 +1,6 @@
 // src/components/checkout/PagamentoStep.jsx
 import React, { useEffect, useState } from "react";
 
-// Ícones SVG simples para manter consistência visual
 const PixIcon = ({ className }) => (
   <svg
     className={className}
@@ -110,13 +109,9 @@ const PagamentoStep = ({
   pixPayment,
   pixLoading,
   pixError,
-  onCreatePix,
   cardPayment,
   cardLoading,
   cardError,
-  onCreateCard,
-  cardData,
-  setCardData,
 }) => {
   const [pixCopied, setPixCopied] = useState(false);
 
@@ -125,9 +120,6 @@ const PagamentoStep = ({
   const pixReady = Boolean(pixCode);
   const [pixCountdown, setPixCountdown] = useState("");
 
-  // Para cartão, tentar extrair url de todos os lugares possíveis
-  const cardCheckoutUrl = cardPayment?.checkoutUrl || cardPayment?.metadata?.providerRaw?.url || cardPayment?.metadata?.url || cardPayment?.url || "";
-
   const formatPixExpiresAt = (value) => {
     if (!value) return "";
     const parsed = new Date(value);
@@ -135,15 +127,10 @@ const PagamentoStep = ({
     return parsed.toLocaleString();
   };
 
-  // pixButtonLabel removido (não utilizado)
+  const pixCopyLabel = pixCopied ? "Codigo copiado" : "Copiar codigo";
 
-  const pixCopyLabel = pixCopied ? "Código copiado" : "Copiar código";
+  const pixExpiresLabel = pixExpiresAt ? formatPixExpiresAt(pixExpiresAt) : "";
 
-  const pixExpiresLabel = pixExpiresAt
-    ? formatPixExpiresAt(pixExpiresAt)
-    : "";
-
-  // Atualiza countdown do Pix
   useEffect(() => {
     if (!pixExpiresAt) {
       setPixCountdown("");
@@ -164,7 +151,9 @@ const PagamentoStep = ({
       const minutes = Math.floor(totalSeconds / 60);
       const seconds = totalSeconds % 60;
       setPixCountdown(
-        `Expira em ${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`
+        `Expira em ${String(minutes).padStart(2, "0")}:${String(
+          seconds
+        ).padStart(2, "0")}`
       );
     };
     updateCountdown();
@@ -172,38 +161,31 @@ const PagamentoStep = ({
     return () => clearInterval(timer);
   }, [pixExpiresAt]);
 
-  // Automatizar cópia do Pix ao gerar
   useEffect(() => {
     if (pagamento === "pix" && pixReady && pixCode && navigator?.clipboard) {
-      navigator.clipboard.writeText(pixCode).then(() => {
-        setPixCopied(true);
-        window.setTimeout(() => setPixCopied(false), 2000);
-        console.log("[PagamentoStep][pix] Código Pix copiado automaticamente.");
-      }).catch(() => {
-        setPixCopied(false);
-      });
+      navigator.clipboard
+        .writeText(pixCode)
+        .then(() => {
+          setPixCopied(true);
+          window.setTimeout(() => setPixCopied(false), 2000);
+          console.log("[PagamentoStep][pix] Codigo Pix copiado.");
+        })
+        .catch(() => {
+          setPixCopied(false);
+        });
     }
   }, [pagamento, pixReady, pixCode]);
 
-  // Automatizar abertura do checkout do cartão
-  useEffect(() => {
-    if (pagamento === "cartao" && cardCheckoutUrl && !cardLoading) {
-      console.log("[PagamentoStep][card] Abrindo checkout automaticamente:", cardCheckoutUrl);
-      window.open(cardCheckoutUrl, "_blank", "noopener,noreferrer");
-    }
-  }, [pagamento, cardCheckoutUrl, cardLoading]);
-
-
-  // Remover handlers manuais, tudo é automático agora
-
-  // Campos do cartão (mantido para possível futura UI de cartão direto)
-  // handleCardInput removido (não utilizado)
-
   return (
     <div className="space-y-6">
-      <h2 className="font-semibold text-lg">Pagamento e finalização</h2>
+      <h2 className="font-semibold text-lg">Pagamento e finalizacao</h2>
 
-      {/* Seleção de método */}
+      <div className="flex justify-center">
+        <span className="premium-info-badge text-[11px]">
+          Voce sera redirecionado automaticamente para o pagamento seguro.
+        </span>
+      </div>
+
       <div className="grid sm:grid-cols-3 gap-4 text-xs">
         <button
           type="button"
@@ -224,7 +206,7 @@ const PagamentoStep = ({
           }`}
         >
           <CardIcon className="h-4 w-4" />
-          <span>Cartão (Pagar agora)</span>
+          <span>Cartao (Pagar agora)</span>
         </button>
 
         <button
@@ -239,38 +221,15 @@ const PagamentoStep = ({
         </button>
       </div>
 
-      {/* Tag AxionPAY */}
-      <div className="flex justify-center mt-2">
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-slate-200 bg-slate-50 text-slate-500 text-[11px] font-normal premium-axionpay-tag" style={{ boxShadow: "none" }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="12" fill="#fff" />
-            <path
-              d="M7.5 12l3 3.5 6-7"
-              stroke="#06B26B"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-          <span>
-            Powered by{" "}
-            <b className="tracking-wide font-semibold text-slate-600">
-              AxionPAY
-            </b>
-          </span>
-        </span>
-      </div>
-
-      {/* PIX */}
       {pagamento === "pix" && (
         <div className="premium-card pix-box bg-white border border-slate-200 rounded-2xl p-4 text-xs space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-sm font-semibold text-slate-800">
-                Pix instantâneo
+                Pix instantaneo
               </p>
               <p className="text-sm text-slate-500">
-                O código é gerado automaticamente ao chegar nesta etapa.
+                O codigo e gerado automaticamente ao chegar nesta etapa.
               </p>
             </div>
           </div>
@@ -281,7 +240,7 @@ const PagamentoStep = ({
             <>
               <div className="space-y-2">
                 <label className="text-sm text-slate-500">
-                  Código copia e cola
+                  Codigo copia e cola
                 </label>
                 <textarea
                   readOnly
@@ -294,7 +253,7 @@ const PagamentoStep = ({
                   </span>
                   {pixExpiresLabel && (
                     <span className="text-[12px] text-slate-500 flex flex-wrap items-center gap-2">
-                      <span>Válido até: {pixExpiresLabel}</span>
+                      <span>Valido ate: {pixExpiresLabel}</span>
                       {pixCountdown && (
                         <span className="pix-countdown">{pixCountdown}</span>
                       )}
@@ -303,7 +262,7 @@ const PagamentoStep = ({
                 </div>
               </div>
               <p className="text-sm text-slate-500">
-                Abra seu banco, escolha Pix copia e cola e cole o código acima.
+                Abra seu banco, escolha Pix copia e cola e cole o codigo acima.
               </p>
             </>
           )}
@@ -315,68 +274,32 @@ const PagamentoStep = ({
         </div>
       )}
 
-      {/* CARTÃO */}
       {pagamento === "cartao" && (
         <div className="premium-card bg-white border border-slate-200 rounded-2xl p-4 text-xs space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-sm font-semibold text-slate-800">
-                Cartão de crédito
+                Cartao de credito
               </p>
               <p className="text-sm text-slate-500">
-                O link para pagamento é gerado automaticamente. O checkout será aberto em nova aba.
+                O link para pagamento e gerado automaticamente.
+              </p>
+              <p className="text-[11px] text-slate-500 mt-1">
+                Ao clicar em "Enviar Pedido", voce sera redirecionado para o checkout seguro AxionPAY.
               </p>
             </div>
           </div>
           {cardError && (
             <p className="text-[11px] text-amber-700">{cardError}</p>
           )}
-          {cardCheckoutUrl && (
-            <p className="text-[11px] text-slate-500 break-all">
-              Link gerado: {cardCheckoutUrl}
+          {cardLoading && (
+            <p className="text-[11px] text-slate-500">
+              Preparando checkout...
             </p>
           )}
-          {cardLoading && (
-            <p className="text-[11px] text-slate-500">Preparando checkout...</p>
-          )}
         </div>
       )}
 
-      {/* DINHEIRO */}
-      {pagamento === "cartao" && (
-        <div className="premium-card bg-white border border-slate-200 rounded-2xl p-4 text-xs space-y-3">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold text-slate-800 mb-1">Cartão de crédito</p>
-              {cardPayment && cardPayment.metadata?.providerRaw?.url ? (
-                <a
-                  href={cardPayment.metadata.providerRaw.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="premium-button px-4 py-2 text-xs font-semibold bg-blue-600 text-white rounded shadow hover:bg-blue-700 transition"
-                >
-                  Abrir checkout AxionPAY
-                </a>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => onCreateCard && onCreateCard()}
-                  disabled={cardLoading}
-                  className="premium-button px-4 py-2 text-xs font-semibold bg-blue-600 text-white rounded shadow hover:bg-blue-700 transition disabled:opacity-60"
-                >
-                  {cardLoading ? "Gerando link..." : "Gerar link de pagamento"}
-                </button>
-              )}
-            </div>
-            {cardError && (
-              <p className="text-[11px] text-amber-700 mt-2 sm:mt-0">{cardError}</p>
-            )}
-          </div>
-
-        </div>
-      )}
-
-      {/* Resumo do pedido */}
       <div className="premium-card bg-white border border-slate-200 rounded-2xl p-4 text-sm space-y-2">
         <p className="flex justify-between">
           <span>Subtotal</span>

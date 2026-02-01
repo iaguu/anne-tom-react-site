@@ -4,66 +4,57 @@
     <meta charset="utf-8" />
     <link rel="icon" href="%PUBLIC_URL%/logopizzaria.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#b71c1c" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta
-      name="apple-mobile-web-app-status-bar-style"
-      content="black-translucent"
-    />
-    <meta name="apple-mobile-web-app-title" content="Anne &amp; Tom" />
-    <meta
-      name="description"
-      content="Site oficial da Pizzaria Anne & Tom: cardápio completo, promoções e pedidos rápidos na Zona Norte de São Paulo."
-    />
-    <meta
-      name="keywords"
-      content="pizzaria, pizza artesanal, Anne & Tom, cardápio, pedido online, Santana, Zona Norte São Paulo"
-    />
-    <meta name="robots" content="index, follow" />
-    <meta property="og:title" content="Pizzaria Anne & Tom" />
-    <meta
-      property="og:description"
-      content="Cardápio completo, promoções e pedidos rápidos com a Anne & Tom. Confira sabores artesanais e combos direto no WhatsApp."
-    />
-    <meta property="og:site_name" content="Pizzaria Anne & Tom" />
-    <meta property="og:locale" content="pt_BR" />
-    <meta property="og:type" content="website" />
-    <meta property="og:image" content="%PUBLIC_URL%/logo512.png" />
-    <meta property="og:image:alt" content="Logo Anne & Tom Pizzaria" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Pizzaria Anne & Tom" />
-    <meta
-      name="twitter:description"
-      content="Cardápio completo, promoções e pedidos rápidos com a Anne & Tom. Confira sabores artesanais e combos direto no WhatsApp."
-    />
-    <meta name="twitter:image" content="%PUBLIC_URL%/logo512.png" />
-    <meta name="twitter:image:alt" content="Logo Anne & Tom Pizzaria" />
+    <meta name="theme-color" content="#f59e0b" />
+    
+    <!-- Preconnect para performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://api.annetom.com" />
+    
+    <!-- DNS prefetch para recursos externos -->
+    <link rel="dns-prefetch" href="//recipesblob.oetker.com.br" />
+    <link rel="dns-prefetch" href="//i.pravatar.cc" />
+    <link rel="dns-prefetch" href="//api.whatsapp.com" />
+    <link rel="dns-prefetch" href="//picsum.photos" />
+    
+    <!-- PWA -->
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/logopizzaria.png" />
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
-    <!--
-      Notice the use of %PUBLIC_URL% in the tags above.
-      It will be replaced with the URL of the `public` folder during the build.
-      Only files inside the `public` folder can be referenced from the HTML.
-
-      Unlike "/favicon.ico" or "favicon.ico", "%PUBLIC_URL%/favicon.ico" will
-      work correctly both with client-side routing and a non-root public URL.
-      Learn how to configure a non-root public URL by running `npm run build`.
-    -->
-    <title>Pizzaria Anne & Tom</title>
+    
+    <!-- Accessibility -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Anne & Tom" />
+    
+    <!-- SEO Base -->
+    <meta name="robots" content="index, follow" />
+    <meta name="author" content="Pizzaria Anne & Tom" />
+    <meta name="language" content="pt-BR" />
+    <meta name="geo.region" content="BR-SP" />
+    <meta name="geo.placename" content="São Paulo" />
+    <meta name="geo.position" content="-23.4678;-46.6298" />
+    <meta name="ICBM" content="-23.4678, -46.6298" />
+    
+    <title>Pizzaria Anne & Tom - Pizzas Artesanais | Delivery Zona Norte SP</title>
+    
+    <!-- Critical CSS inline -->
+    <style>
+      /* Critical CSS for above-the-fold content */
+      body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Roboto','Oxygen','Ubuntu','Cantarell','Fira Sans','Droid Sans','Helvetica Neue',sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;background-color:#f8fafc}
+      .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+      .focus:not-sr-only{position:static;width:auto;height:auto;padding:initial;margin:initial;overflow:visible;clip:auto;white-space:normal}
+    </style>
   </head>
   <body>
-    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <noscript>
+      <div style="text-align: center; padding: 50px; font-family: Arial, sans-serif;">
+        <h1>🍕 Pizzaria Anne & Tom</h1>
+        <p>Para acessar nosso cardápio completo e fazer pedidos, por favor habilite o JavaScript no seu navegador.</p>
+        <p><strong>Telefone:</strong> (11) 93250-7007</p>
+        <p><a href="https://api.whatsapp.com/send?phone=5511932507007" target="_blank">Peça pelo WhatsApp</a></p>
+      </div>
+    </noscript>
     <div id="root"></div>
-    <!--
-      This HTML file is a template.
-      If you open it directly in the browser, you will see an empty page.
-
-      You can add webfonts, meta tags, or analytics to this file.
-      The build step will place the bundled scripts into the <body> tag.
-
-      To begin the development, run `npm start` or `yarn start`.
-      To create a production bundle, use `npm run build` or `yarn build`.
-    -->
   </body>
 </html>

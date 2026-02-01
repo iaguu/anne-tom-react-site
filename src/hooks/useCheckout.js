@@ -56,6 +56,21 @@ const savePaymentToSession = (key, total, payment) => {
 
 /* ================= WHATSAPP BUILDER ================== */
 
+const formatEnderecoCompleto = (cliente) => {
+  if (!cliente) return "";
+  const rua = cliente.endereco || "";
+  const numero = cliente.numero ? `, ${cliente.numero}` : "";
+  const complemento = cliente.complemento ? ` - ${cliente.complemento}` : "";
+  const bairro = cliente.bairro ? `, ${cliente.bairro}` : "";
+  const cidadeUf =
+    cliente.cidade || cliente.uf
+      ? ` - ${[cliente.cidade, cliente.uf].filter(Boolean).join("/")}`
+      : "";
+  const cep = cliente.cep ? ` CEP ${cliente.cep}` : "";
+
+  return `${rua}${numero}${complemento}${bairro}${cidadeUf}${cep}`.trim();
+};
+
 const montarTextoWhatsApp = (itens, cliente, totalFinal, pagamento) => {
   const itensStr = itens
     .map((i) => {
@@ -94,15 +109,16 @@ const montarTextoWhatsApp = (itens, cliente, totalFinal, pagamento) => {
     `\n\n*Cliente:* ${cliente.nome}` +
     `\n*Telefone:* ${cliente.telefone}` +
     `\n*CEP:* ${cliente.cep}` +
-    `\n*Endereço:* ${cliente.endereco}` +
+    `\n*Endereço:* ${formatEnderecoCompleto(cliente)}` +
     `\n*Bairro:* ${cliente.bairro}` +
+    (cliente.referencia ? `\n*Referencia:* ${cliente.referencia}` : "") +
     (cliente.obsGerais ? `\n\n*Observações gerais:* ${cliente.obsGerais}` : "")
   );
 };
 
 /* ============ ENVIO PARA O DESKTOP (API NGROK) ============ */
 
-async function enviarParaDesktop(items, dados, totalFinal, pagamento) {
+export async function enviarParaDesktop(items, dados, totalFinal, pagamento) {
   try {
     const payload = {
       source: "website",
@@ -116,10 +132,20 @@ async function enviarParaDesktop(items, dados, totalFinal, pagamento) {
         id: dados.customerId || null,
         name: dados.nome,
         phone: dados.telefone?.replace(/\D/g, ""),
+        email: dados.email || null,
         address: {
           cep: dados.cep,
           street: dados.endereco,
+          number: dados.numero,
+          complement: dados.complemento,
           neighborhood: dados.bairro,
+          reference: dados.referencia,
+          city: dados.cidade,
+          state: dados.uf,
+          geo:
+            dados.latitude != null && dados.longitude != null
+              ? { lat: dados.latitude, lng: dados.longitude }
+              : null,
         },
       },
 
@@ -236,10 +262,20 @@ async function salvarCliente(dadosCliente) {
     source: "website",
     name: dadosCliente.nome,
     phone: phoneDigits,
+    email: dadosCliente.email || "",
     address: {
       cep: dadosCliente.cep || "",
       street: dadosCliente.endereco || "",
+      number: dadosCliente.numero || "",
+      complement: dadosCliente.complemento || "",
       neighborhood: dadosCliente.bairro || "",
+      reference: dadosCliente.referencia || "",
+      city: dadosCliente.cidade || "",
+      state: dadosCliente.uf || "",
+      geo:
+        dadosCliente.latitude != null && dadosCliente.longitude != null
+          ? { lat: dadosCliente.latitude, lng: dadosCliente.longitude }
+          : null,
     },
   };
 
@@ -275,21 +311,32 @@ export function useCheckout() {
   const [pixError, setPixError] = useState("");
   const pixIdempotencyRef = useRef(null);
   const pixTotalRef = useRef(null);
+  const pixAutoKeyRef = useRef(null);
 
   // CARTÃO (AXIONPAY)
   const [cardPayment, setCardPayment] = useState(null);
   const [cardLoading, setCardLoading] = useState(false);
   const [cardError, setCardError] = useState("");
   const cardIdempotencyRef = useRef(null);
+  const cardTotalRef = useRef(null);
+  const cardAutoKeyRef = useRef(null);
 
   const { customer } = useAuth();
 
   const [dados, setDados] = useState({
     nome: "",
     telefone: "",
+    email: "",
     cep: "",
     endereco: "",
+    numero: "",
+    complemento: "",
     bairro: "",
+    cidade: "",
+    uf: "",
+    referencia: "",
+    latitude: null,
+    longitude: null,
     obsGerais: "",
     retirada: false,
     subtotal: total,
@@ -351,9 +398,17 @@ export function useCheckout() {
     const toSave = {
       nome: dados.nome,
       telefone: dados.telefone,
+      email: dados.email,
       cep: dados.cep,
       endereco: dados.endereco,
+      numero: dados.numero,
+      complemento: dados.complemento,
       bairro: dados.bairro,
+      cidade: dados.cidade,
+      uf: dados.uf,
+      referencia: dados.referencia,
+      latitude: dados.latitude,
+      longitude: dados.longitude,
       obsGerais: dados.obsGerais,
       retirada: dados.retirada,
       customerId: dados.customerId || null,
@@ -366,9 +421,17 @@ export function useCheckout() {
   }, [
     dados.nome,
     dados.telefone,
+    dados.email,
     dados.cep,
     dados.endereco,
+    dados.numero,
+    dados.complemento,
     dados.bairro,
+    dados.cidade,
+    dados.uf,
+    dados.referencia,
+    dados.latitude,
+    dados.longitude,
     dados.obsGerais,
     dados.retirada,
     dados.customerId,
@@ -388,17 +451,43 @@ export function useCheckout() {
         prev.nome,
       telefone:
         prev.telefone || customer.telefone || customer.phone || prev.telefone,
+      email: prev.email || customer.email || prev.email,
       cep: prev.cep || customer.address?.cep || prev.cep,
       endereco:
         prev.endereco ||
         customer.address?.street ||
         customer.address?.endereco ||
         prev.endereco,
+      numero:
+        prev.numero ||
+        customer.address?.number ||
+        customer.address?.numero ||
+        prev.numero,
+      complemento:
+        prev.complemento ||
+        customer.address?.complement ||
+        customer.address?.complemento ||
+        prev.complemento,
       bairro:
         prev.bairro ||
         customer.address?.neighborhood ||
         customer.address?.bairro ||
         prev.bairro,
+      cidade:
+        prev.cidade ||
+        customer.address?.city ||
+        customer.address?.cidade ||
+        prev.cidade,
+      uf:
+        prev.uf ||
+        customer.address?.state ||
+        customer.address?.uf ||
+        prev.uf,
+      referencia:
+        prev.referencia ||
+        customer.address?.reference ||
+        customer.address?.referencia ||
+        prev.referencia,
       customerId:
         prev.customerId ||
         customer.id ||
@@ -442,6 +531,7 @@ export function useCheckout() {
   const enderecoValido = dados.retirada
     ? true
     : Boolean(dados.endereco.trim()) &&
+      Boolean(dados.numero?.toString().trim()) &&
       Boolean(dados.bairro.trim()) &&
       cepDigits.length === 8;
   const dadosValidos = dadosBasicosValidos && enderecoValido;
@@ -450,11 +540,25 @@ export function useCheckout() {
     : distanceFee != null && !deliveryEtaLoading && !deliveryEtaError;
   const podeAvancarDados = dadosValidos && distanciaOk;
 
+  const cardCheckoutUrl = useMemo(() => {
+    if (!cardPayment) return "";
+    return (
+      cardPayment.checkoutUrl ||
+      cardPayment?.metadata?.providerRaw?.url ||
+      cardPayment?.metadata?.url ||
+      cardPayment?.url ||
+      ""
+    );
+  }, [cardPayment]);
+
   const hasPixData =
     pagamento !== "pix" ||
     Boolean(pixPayment?.copiaColar || pixPayment?.qrcode);
 
-  const podeEnviar = !semItens && podeAvancarDados && hasPixData && !enviando;
+  const hasCardData = pagamento !== "cartao" || Boolean(cardCheckoutUrl);
+
+  const podeEnviar =
+    !semItens && podeAvancarDados && hasPixData && hasCardData && !enviando;
 
   /* =========== CUPOM =========== */
 
@@ -473,6 +577,7 @@ export function useCheckout() {
     setPixError("");
     pixIdempotencyRef.current = null;
     pixTotalRef.current = null;
+    pixAutoKeyRef.current = null;
     try {
       if (typeof sessionStorage !== "undefined") {
         sessionStorage.removeItem(PIX_SESSION_KEY);
@@ -482,23 +587,18 @@ export function useCheckout() {
     }
   }, []);
 
-  useEffect(() => {
-    if (pagamento !== "pix") {
-      resetPixPayment();
-    }
-  }, [pagamento, resetPixPayment]);
+  // Mantemos o Pix gerado mesmo ao alternar o método de pagamento.
 
   useEffect(() => {
     const previousTotal = pixTotalRef.current;
     pixTotalRef.current = totalFinal;
 
-    if (pagamento !== "pix") return;
     if (previousTotal == null) return;
     if (previousTotal === totalFinal) return;
     if (!pixPayment) return;
 
     resetPixPayment();
-  }, [totalFinal, pagamento, pixPayment, resetPixPayment]);
+  }, [totalFinal, pixPayment, resetPixPayment]);
 
   const buildPixPayload = (customerIdAtual) => {
     const amount = Number(totalFinal.toFixed(2));
@@ -633,6 +733,8 @@ export function useCheckout() {
     setCardPayment(null);
     setCardError("");
     cardIdempotencyRef.current = null;
+    cardTotalRef.current = null;
+    cardAutoKeyRef.current = null;
     try {
       if (typeof sessionStorage !== "undefined") {
         sessionStorage.removeItem(CARD_SESSION_KEY);
@@ -642,14 +744,24 @@ export function useCheckout() {
     }
   }, []);
 
+  // Mantemos o cartão gerado mesmo ao alternar o método de pagamento.
+
   useEffect(() => {
-    if (pagamento !== "cartao") {
-      resetCardPayment();
-    }
-  }, [pagamento, resetCardPayment]);
+    const previousTotal = cardTotalRef.current;
+    cardTotalRef.current = totalFinal;
+
+    if (previousTotal == null) return;
+    if (previousTotal === totalFinal) return;
+    if (!cardPayment) return;
+
+    resetCardPayment();
+  }, [totalFinal, cardPayment, resetCardPayment]);
 
   const buildCardPayload = () => {
     const amount = Number(totalFinal.toFixed(2));
+    const returnBase = "https://annetom.com/confirmacao";
+    const successUrl = `${returnBase}?paymentStatus=paid`;
+    const failureUrl = `${returnBase}?paymentStatus=failed`;
     return {
       amount,
       customer: {
@@ -658,6 +770,9 @@ export function useCheckout() {
         phone_number: dados.telefone,
       },
       card: dados.card || undefined,
+      return_url: returnBase,
+      success_url: successUrl,
+      failure_url: failureUrl,
       metadata: {
         address: {
           cep: dados.cep,
@@ -665,8 +780,17 @@ export function useCheckout() {
           neighborhood: dados.bairro,
           number: dados.numero,
           complement: dados.complemento,
+          reference: dados.referencia,
+          city: dados.cidade,
+          state: dados.uf,
+          geo:
+            dados.latitude != null && dados.longitude != null
+              ? { lat: dados.latitude, lng: dados.longitude }
+              : null,
         },
         orderId: dados.orderId || undefined,
+        redirect_url: returnBase,
+        webhook_url: "https://api.annetom.com/order/confirm",
       },
     };
   };
@@ -710,11 +834,7 @@ export function useCheckout() {
 
       setCardPayment(responsePayload);
       savePaymentToSession(CARD_SESSION_KEY, totalFinal, responsePayload);
-
-      const url = responsePayload?.metadata?.providerRaw?.url;
-      if (url) {
-        window.location.href = url;
-      }
+      cardTotalRef.current = totalFinal;
 
       return responsePayload;
     } catch (err) {
@@ -728,17 +848,36 @@ export function useCheckout() {
 
   // Geração automática das transações de pagamento (PIX/cartão) ao entrar no passo "Pagamento"
   useEffect(() => {
-    if (passo !== 3) return;
-
-    if (pagamento === "pix" && !pixPayment && !pixLoading) {
-      createPixPayment().catch(() => {});
+    if (passo !== 3) {
+      pixAutoKeyRef.current = null;
+      cardAutoKeyRef.current = null;
+      return;
     }
 
-    if (pagamento === "cartao" && !cardPayment && !cardLoading) {
-      createCardPayment().catch(() => {});
+    if (!pixPayment && !pixLoading) {
+      const pixKey = `pix:${totalFinal.toFixed(2)}`;
+      if (pixAutoKeyRef.current !== pixKey) {
+        pixAutoKeyRef.current = pixKey;
+        createPixPayment().catch(() => {});
+      }
+    }
+
+    if (!cardPayment && !cardLoading) {
+      const cardKey = `card:${totalFinal.toFixed(2)}`;
+      if (cardAutoKeyRef.current !== cardKey) {
+        cardAutoKeyRef.current = cardKey;
+        createCardPayment().catch(() => {});
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [passo, pagamento, pixPayment, pixLoading, cardPayment, cardLoading]);
+  }, [
+    passo,
+    totalFinal,
+    pixPayment,
+    pixLoading,
+    cardPayment,
+    cardLoading,
+  ]);
 
   /* =========== ETA ENTREGA (DISTANCE MATRIX) =========== */
 
@@ -753,7 +892,13 @@ export function useCheckout() {
       return;
     }
 
-    const destination = [dados.endereco, dados.bairro]
+    const destination = [
+      dados.endereco,
+      dados.numero,
+      dados.bairro,
+      dados.cidade,
+      dados.uf,
+    ]
       .filter(Boolean)
       .join(", ");
 
@@ -796,7 +941,14 @@ export function useCheckout() {
       cancelled = true;
       clearTimeout(timeout);
     };
-  }, [dados.endereco, dados.bairro, dados.retirada]);
+  }, [
+    dados.endereco,
+    dados.numero,
+    dados.bairro,
+    dados.cidade,
+    dados.uf,
+    dados.retirada,
+  ]);
 
   /* =========== CEP =========== */
 
@@ -815,13 +967,12 @@ export function useCheckout() {
       if (json.erro) {
         setErroCep("CEP não encontrado.");
       } else {
-        const enderecoFormatado = `${json.logradouro || ""}, ${
-          json.bairro || ""
-        } - ${json.localidade || ""}/${json.uf || ""}`.trim();
         setDados((d) => ({
           ...d,
-          endereco: enderecoFormatado,
+          endereco: json.logradouro || d.endereco,
           bairro: json.bairro || d.bairro,
+          cidade: json.localidade || d.cidade,
+          uf: json.uf || d.uf,
         }));
       }
     } catch (e) {
@@ -1086,6 +1237,7 @@ export function useCheckout() {
     cardLoading,
     cardError,
     createCardPayment,
+    cardCheckoutUrl,
 
     // totais
     subtotal,
